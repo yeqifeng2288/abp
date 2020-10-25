@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -45,7 +45,7 @@ namespace Volo.Docs
         {
             Configure<AbpVirtualFileSystemOptions>(options =>
             {
-                options.FileSets.AddEmbedded<DocsWebModule>("Volo.Docs");
+                options.FileSets.AddEmbedded<DocsWebModule>();
             });
 
             var configuration = context.Services.GetConfiguration();
@@ -61,6 +61,7 @@ namespace Volo.Docs
                 options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + "{projectName}");
                 options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + "{languageCode}/{projectName}");
                 options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + "{languageCode}/{projectName}/{version}/{*documentName}");
+                options.Conventions.AddPageRoute("/Documents/Search", routePrefix + "search/{languageCode}/{projectName}/{version}/{*keyword}");
             });
 
             context.Services.AddAutoMapperObjectMapper<DocsWebModule>();

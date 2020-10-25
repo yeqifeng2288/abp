@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -15,18 +15,18 @@ namespace MyCompanyName.MyProjectName.Data
         public ILogger<MyProjectNameDbMigrationService> Logger { get; set; }
 
         private readonly IDataSeeder _dataSeeder;
-        private readonly IMyProjectNameDbSchemaMigrator _dbSchemaMigrator;
+        private readonly IEnumerable<IMyProjectNameDbSchemaMigrator> _dbSchemaMigrators;
         private readonly ITenantRepository _tenantRepository;
         private readonly ICurrentTenant _currentTenant;
 
         public MyProjectNameDbMigrationService(
             IDataSeeder dataSeeder,
-            IMyProjectNameDbSchemaMigrator dbSchemaMigrator,
+            IEnumerable<IMyProjectNameDbSchemaMigrator> dbSchemaMigrators,
             ITenantRepository tenantRepository,
             ICurrentTenant currentTenant)
         {
             _dataSeeder = dataSeeder;
-            _dbSchemaMigrator = dbSchemaMigrator;
+            _dbSchemaMigrators = dbSchemaMigrators;
             _tenantRepository = tenantRepository;
             _currentTenant = currentTenant;
 
@@ -37,43 +37,57 @@ namespace MyCompanyName.MyProjectName.Data
         {
             Logger.LogInformation("Started database migrations...");
 
-            await MigrateHostDatabaseAsync();
+            await MigrateDatabaseSchemaAsync();
+            await SeedDataAsync();
 
-            var i = 0;
-            var tenants = await _tenantRepository.GetListAsync();
+            Logger.LogInformation($"Successfully completed host database migrations.");
+
+            var tenants = await _tenantRepository.GetListAsync(includeDetails: true);
+
+            var migratedDatabaseSchemas = new HashSet<string>();
             foreach (var tenant in tenants)
             {
-                i++;
-
                 using (_currentTenant.Change(tenant.Id))
                 {
-                    Logger.LogInformation($"Migrating {tenant.Name} database schema... ({i} of {tenants.Count})");
-                    await MigrateTenantDatabasesAsync(tenant);
-                    Logger.LogInformation($"Successfully completed {tenant.Name} database migrations.");
+                    if (tenant.ConnectionStrings.Any())
+                    {
+                        var tenantConnectionStrings = tenant.ConnectionStrings
+                            .Select(x => x.Value)
+                            .ToList();
+
+                        if (!migratedDatabaseSchemas.IsSupersetOf(tenantConnectionStrings))
+                        {
+                            await MigrateDatabaseSchemaAsync(tenant);
+
+                            migratedDatabaseSchemas.AddIfNotContains(tenantConnectionStrings);
+                        }
+                    }
+
+                    await SeedDataAsync(tenant);
                 }
+
+                Logger.LogInformation($"Successfully completed {tenant.Name} tenant database migrations.");
             }
 
             Logger.LogInformation("Successfully completed database migrations.");
         }
 
-        private async Task MigrateHostDatabaseAsync()
+        private async Task MigrateDatabaseSchemaAsync(Tenant tenant = null)
         {
-            Logger.LogInformation("Migrating host database schema...");
-            await _dbSchemaMigrator.MigrateAsync();
+            Logger.LogInformation(
+                $"Migrating schema for {(tenant == null ? "host" : tenant.Name + " tenant")} database...");
 
-            Logger.LogInformation("Executing host database seed...");
-            await _dataSeeder.SeedAsync();
-
-            Logger.LogInformation("Successfully completed host database migrations.");
+            foreach (var migrator in _dbSchemaMigrators)
+            {
+                await migrator.MigrateAsync();
+            }
         }
 
-        private async Task MigrateTenantDatabasesAsync(Tenant tenant)
+        private async Task SeedDataAsync(Tenant tenant = null)
         {
-            Logger.LogInformation($"Migrating schema for {tenant.Name} database...");
-            await _dbSchemaMigrator.MigrateAsync();
+            Logger.LogInformation($"Executing {(tenant == null ? "host" : tenant.Name + " tenant")} database seed...");
 
-            Logger.LogInformation($"Executing {tenant.Name} tenant database seed...");
-            await _dataSeeder.SeedAsync(tenant.Id);
+            await _dataSeeder.SeedAsync(tenant?.Id);
         }
     }
 }

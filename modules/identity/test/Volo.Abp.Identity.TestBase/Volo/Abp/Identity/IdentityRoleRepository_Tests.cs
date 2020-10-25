@@ -39,7 +39,7 @@ namespace Volo.Abp.Identity
         [Fact]
         public async Task GetDefaultOnesAsync()
         {
-            var roles = await RoleRepository.GetDefaultOnesAsync().ConfigureAwait(false);
+            var roles = await RoleRepository.GetDefaultOnesAsync();
 
             foreach (var role in roles)
             {
@@ -51,6 +51,12 @@ namespace Volo.Abp.Identity
         public async Task GetCountAsync()
         {
             (await RoleRepository.GetCountAsync()).ShouldBeGreaterThan(0);
+        }
+
+        [Fact]
+        public async Task GetCountAsync_With_Filter()
+        {
+            (await RoleRepository.GetCountAsync("admin")).ShouldBe(1);
         }
 
         [Fact]

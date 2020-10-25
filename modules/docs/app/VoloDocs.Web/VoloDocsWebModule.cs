@@ -33,6 +33,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Volo.Abp.Account;
 using Volo.Abp.Validation.Localization;
+using Volo.Docs.Documents.FullSearch.Elastic;
 
 namespace VoloDocs.Web
 {
@@ -69,6 +70,11 @@ namespace VoloDocs.Web
             Configure<DocsUiOptions>(options =>
             {
                 options.RoutePrefix = null;
+            });
+
+            Configure<DocsElasticSearchOptions>(options =>
+            {
+                options.Enable = true;
             });
 
             Configure<AbpDbConnectionOptions>(options =>
@@ -117,6 +123,7 @@ namespace VoloDocs.Web
             {
                 options.Languages.Add(new LanguageInfo("cs", "cs", "Čeština"));
                 options.Languages.Add(new LanguageInfo("en", "en", "English"));
+                options.Languages.Add(new LanguageInfo("hu", "hu", "Magyar"));
                 options.Languages.Add(new LanguageInfo("tr", "tr", "Türkçe"));
                 options.Languages.Add(new LanguageInfo("zh-Hans", "zh-Hans", "简体中文"));
 
@@ -161,7 +168,7 @@ namespace VoloDocs.Web
            
             //app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
-            app.UseMvcWithDefaultRouteAndArea();
+            app.UseConfiguredEndpoints();
 
             using (var scope = context.ServiceProvider.CreateScope())
             {

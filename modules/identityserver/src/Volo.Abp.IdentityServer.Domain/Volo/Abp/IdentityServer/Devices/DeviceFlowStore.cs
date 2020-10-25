@@ -5,20 +5,19 @@ using IdentityServer4.Models;
 using IdentityServer4.Stores;
 using IdentityServer4.Stores.Serialization;
 using JetBrains.Annotations;
-using Volo.Abp.DependencyInjection;
 using Volo.Abp.Guids;
 
 namespace Volo.Abp.IdentityServer.Devices
 {
-    public class DeviceFlowStore : IDeviceFlowStore, ITransientDependency
+    public class DeviceFlowStore : IDeviceFlowStore
     {
         protected IDeviceFlowCodesRepository DeviceFlowCodesRepository { get; }
         protected IGuidGenerator GuidGenerator { get; }
         protected IPersistentGrantSerializer PersistentGrantSerializer { get; }
 
         public DeviceFlowStore(
-            IDeviceFlowCodesRepository deviceFlowCodesRepository, 
-            IGuidGenerator guidGenerator, 
+            IDeviceFlowCodesRepository deviceFlowCodesRepository,
+            IGuidGenerator guidGenerator,
             IPersistentGrantSerializer persistentGrantSerializer)
         {
             DeviceFlowCodesRepository = deviceFlowCodesRepository;
@@ -26,7 +25,7 @@ namespace Volo.Abp.IdentityServer.Devices
             PersistentGrantSerializer = persistentGrantSerializer;
         }
 
-        public async Task StoreDeviceAuthorizationAsync(string deviceCode, string userCode, DeviceCode data)
+        public virtual async Task StoreDeviceAuthorizationAsync(string deviceCode, string userCode, DeviceCode data)
         {
             Check.NotNull(deviceCode, nameof(deviceCode));
             Check.NotNull(userCode, nameof(userCode));
@@ -46,8 +45,8 @@ namespace Volo.Abp.IdentityServer.Devices
                     }
                 );
         }
-        
-        public async Task<DeviceCode> FindByUserCodeAsync(string userCode)
+
+        public virtual async Task<DeviceCode> FindByUserCodeAsync(string userCode)
         {
             Check.NotNull(userCode, nameof(userCode));
 
@@ -63,14 +62,14 @@ namespace Volo.Abp.IdentityServer.Devices
             return DeserializeToDeviceCode(deviceCodes.Data);
         }
 
-        public async Task<DeviceCode> FindByDeviceCodeAsync(string deviceCode)
+        public virtual async Task<DeviceCode> FindByDeviceCodeAsync(string deviceCode)
         {
             Check.NotNull(deviceCode, nameof(deviceCode));
 
             var deviceCodes = await DeviceFlowCodesRepository
                 .FindByDeviceCodeAsync(deviceCode)
                 ;
-            
+
             if (deviceCodes == null)
             {
                 return null;
@@ -79,7 +78,7 @@ namespace Volo.Abp.IdentityServer.Devices
             return DeserializeToDeviceCode(deviceCodes.Data);
         }
 
-        public async Task UpdateByUserCodeAsync(string userCode, DeviceCode data)
+        public virtual async Task UpdateByUserCodeAsync(string userCode, DeviceCode data)
         {
             Check.NotNull(userCode, nameof(userCode));
             Check.NotNull(data, nameof(data));
@@ -102,7 +101,7 @@ namespace Volo.Abp.IdentityServer.Devices
                 ;
         }
 
-        public async Task RemoveByDeviceCodeAsync(string deviceCode)
+        public virtual async Task RemoveByDeviceCodeAsync(string deviceCode)
         {
             Check.NotNull(deviceCode, nameof(deviceCode));
 
@@ -120,7 +119,7 @@ namespace Volo.Abp.IdentityServer.Devices
                 ;
         }
 
-        private string Serialize([CanBeNull] DeviceCode deviceCode)
+        protected virtual string Serialize([CanBeNull] DeviceCode deviceCode)
         {
             if (deviceCode == null)
             {

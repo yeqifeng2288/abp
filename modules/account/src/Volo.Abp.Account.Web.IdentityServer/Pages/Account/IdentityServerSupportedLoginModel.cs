@@ -14,9 +14,10 @@ using System.Security.Principal;
 using System.Threading.Tasks;
 using Volo.Abp.Account.Settings;
 using Volo.Abp.DependencyInjection;
+using Volo.Abp.Identity;
+using Volo.Abp.Identity.AspNetCore;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.Settings;
-using Volo.Abp.Uow;
 
 namespace Volo.Abp.Account.Web.Pages.Account
 {
@@ -29,12 +30,12 @@ namespace Volo.Abp.Account.Web.Pages.Account
 
         public IdentityServerSupportedLoginModel(
             IAuthenticationSchemeProvider schemeProvider,
-            IOptions<AbpAccountOptions> accountOptions, 
-            IIdentityServerInteractionService interaction, 
-            IClientStore clientStore, 
+            IOptions<AbpAccountOptions> accountOptions,
+            IIdentityServerInteractionService interaction,
+            IClientStore clientStore,
             IEventService identityServerEvents)
             :base(
-                schemeProvider, 
+                schemeProvider,
                 accountOptions)
         {
             Interaction = interaction;
@@ -50,6 +51,8 @@ namespace Volo.Abp.Account.Web.Pages.Account
 
             if (context != null)
             {
+                ShowCancelButton = true;
+
                 LoginInput.UserNameOrEmailAddress = context.LoginHint;
 
                 //TODO: Reference AspNetCore MultiTenancy module and use options to get the tenant key!
@@ -68,21 +71,14 @@ namespace Volo.Abp.Account.Web.Pages.Account
                 return Page();
             }
 
-            var schemes = await _schemeProvider.GetAllSchemesAsync();
-
-            var providers = schemes
-                .Where(x => x.DisplayName != null || x.Name.Equals(_accountOptions.WindowsAuthenticationSchemeName, StringComparison.OrdinalIgnoreCase))
-                .Select(x => new ExternalProviderModel
-                {
-                    DisplayName = x.DisplayName,
-                    AuthenticationScheme = x.Name
-                })
-                .ToList();
+            var providers = await GetExternalProviders();
+            ExternalProviders = providers.ToList();
 
             EnableLocalLogin = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
-            if (context?.ClientId != null)
+
+            if (context?.Client?.ClientId != null)
             {
-                var client = await ClientStore.FindEnabledClientByIdAsync(context.ClientId);
+                var client = await ClientStore.FindEnabledClientByIdAsync(context?.Client?.ClientId);
                 if (client != null)
                 {
                     EnableLocalLogin = client.EnableLocalLogin;
@@ -94,8 +90,6 @@ namespace Volo.Abp.Account.Web.Pages.Account
                 }
             }
 
-            ExternalProviders = providers.ToArray();
-
             if (IsExternalLoginOnly)
             {
                 return await base.OnPostExternalLogin(providers.First().AuthenticationScheme);
@@ -104,7 +98,6 @@ namespace Volo.Abp.Account.Web.Pages.Account
             return Page();
         }
 
-        [UnitOfWork] //TODO: Will be removed when we implement action filter
         public override async Task<IActionResult> OnPostAsync(string action)
         {
             if (action == "Cancel")
@@ -115,7 +108,10 @@ namespace Volo.Abp.Account.Web.Pages.Account
                     return Redirect("~/");
                 }
 
-                await Interaction.GrantConsentAsync(context, ConsentResponse.Denied);
+                await Interaction.GrantConsentAsync(context, new ConsentResponse()
+                {
+                    Error = AuthorizationError.AccessDenied
+                });
 
                 return Redirect(ReturnUrl);
             }
@@ -123,6 +119,10 @@ namespace Volo.Abp.Account.Web.Pages.Account
             await CheckLocalLoginAsync();
 
             ValidateModel();
+
+            ExternalProviders = await GetExternalProviders();
+
+            EnableLocalLogin = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
 
             await ReplaceEmailToUsernameOfInputIfNeeds();
 
@@ -133,14 +133,16 @@ namespace Volo.Abp.Account.Web.Pages.Account
                 true
             );
 
+            await IdentitySecurityLogManager.SaveAsync(new IdentitySecurityLogContext()
+            {
+                Identity = IdentitySecurityLogIdentityConsts.Identity,
+                Action = result.ToIdentitySecurityLogAction(),
+                UserName = LoginInput.UserNameOrEmailAddress
+            });
+
             if (result.RequiresTwoFactor)
             {
-                return RedirectToPage("./SendSecurityCode", new
-                {
-                    returnUrl = ReturnUrl,
-                    returnUrlHash = ReturnUrlHash,
-                    rememberMe = LoginInput.RememberMe
-                });
+                return await TwoFactorLoginResultAsync();
             }
 
             if (result.IsLockedOut)
@@ -171,10 +173,9 @@ namespace Volo.Abp.Account.Web.Pages.Account
             return RedirectSafely(ReturnUrl, ReturnUrlHash);
         }
 
-        [UnitOfWork]
         public override async Task<IActionResult> OnPostExternalLogin(string provider)
         {
-            if (_accountOptions.WindowsAuthenticationSchemeName == provider)
+            if (AccountOptions.WindowsAuthenticationSchemeName == provider)
             {
                 return await ProcessWindowsLoginAsync();
             }
@@ -184,10 +185,10 @@ namespace Volo.Abp.Account.Web.Pages.Account
 
         private async Task<IActionResult> ProcessWindowsLoginAsync()
         {
-            var result = await HttpContext.AuthenticateAsync(_accountOptions.WindowsAuthenticationSchemeName);
+            var result = await HttpContext.AuthenticateAsync(AccountOptions.WindowsAuthenticationSchemeName);
             if (!(result?.Principal is WindowsPrincipal windowsPrincipal))
             {
-                return Challenge(_accountOptions.WindowsAuthenticationSchemeName);
+                return Challenge(AccountOptions.WindowsAuthenticationSchemeName);
             }
 
             var props = new AuthenticationProperties
@@ -195,11 +196,11 @@ namespace Volo.Abp.Account.Web.Pages.Account
                 RedirectUri = Url.Page("./Login", pageHandler: "ExternalLoginCallback", values: new { ReturnUrl, ReturnUrlHash }),
                 Items =
                 {
-                    {"scheme", _accountOptions.WindowsAuthenticationSchemeName},
+                    {"scheme", AccountOptions.WindowsAuthenticationSchemeName},
                 }
             };
 
-            var identity = new ClaimsIdentity(_accountOptions.WindowsAuthenticationSchemeName);
+            var identity = new ClaimsIdentity(AccountOptions.WindowsAuthenticationSchemeName);
             identity.AddClaim(new Claim(JwtClaimTypes.Subject, windowsPrincipal.Identity.Name));
             identity.AddClaim(new Claim(JwtClaimTypes.Name, windowsPrincipal.Identity.Name));
 
