@@ -13,9 +13,9 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Collapse
         {
             SetRandomIdIfNotProvided();
 
-            var innerContent = (await output.GetChildContentAsync()).GetContent();
+            var childContent = await output.GetChildContentAsync();
 
-            var html = GetAccordionHeaderItem(context, output) + GetAccordionContentItem(context, output, innerContent);
+            var html = GetAccordionHeaderItem(context, output) + GetAccordionContentItem(context, output, childContent);
 
             var tabHeaderItems = context.GetValue<List<string>>(AccordionItems);
             tabHeaderItems.Add(html);
@@ -28,11 +28,11 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Collapse
             var button = new TagBuilder("button");
             button.AddCssClass("btn btn-link");
             button.Attributes.Add("type", "button");
-            button.Attributes.Add("data-toggle", "collapse");
-            button.Attributes.Add("data-target", "#" + GetContentId());
+            button.Attributes.Add("data-bs-toggle", "collapse");
+            button.Attributes.Add("data-bs-target", "#" + GetContentId());
             button.Attributes.Add("aria-expanded", "true");
             button.Attributes.Add("aria-controls", GetContentId());
-            button.InnerHtml.Append(TagHelper.Title);
+            button.InnerHtml.AppendHtml(TagHelper.Title);
 
             var h5 = new TagBuilder("h5");
             h5.AddCssClass("mb-0");
@@ -46,7 +46,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Collapse
             return header.ToHtmlString();
         }
 
-        protected virtual string GetAccordionContentItem(TagHelperContext context, TagHelperOutput output, string content)
+        protected virtual string GetAccordionContentItem(TagHelperContext context, TagHelperOutput output, TagHelperContent content)
         {
             var show = (TagHelper.Active ?? false) ? " show" : "";
 
@@ -58,7 +58,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Collapse
             wrapper.AddCssClass("collapse" + show);
             wrapper.Attributes.Add("id", GetContentId());
             wrapper.Attributes.Add("aria-labelledby", GetHeadingId());
-            wrapper.Attributes.Add("data-parent", "#" + AbpAccordionParentIdPlaceholder);
+            wrapper.Attributes.Add("data-bs-parent", "#" + AbpAccordionParentIdPlaceholder);
             wrapper.InnerHtml.AppendHtml(cardBody);
 
             return wrapper.ToHtmlString();

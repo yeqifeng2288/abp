@@ -7,6 +7,10 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Volo.Abp.AspNetCore.Auditing;
+using Volo.Abp.AspNetCore.SignalR.Auditing;
+using Volo.Abp.AspNetCore.SignalR.Authentication;
+using Volo.Abp.Auditing;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Modularity;
 
@@ -30,7 +34,15 @@ namespace Volo.Abp.AspNetCore.SignalR
 
         public override void ConfigureServices(ServiceConfigurationContext context)
         {
-            context.Services.AddSignalR();
+            var routePatterns = new List<string> {"/signalr-hubs"};
+            var signalRServerBuilder = context.Services.AddSignalR(options =>
+            {
+                options.AddFilter<AbpHubContextAccessorHubFilter>();
+                options.AddFilter<AbpAuthenticationHubFilter>();
+                options.AddFilter<AbpAuditHubFilter>();
+            });
+
+            context.Services.ExecutePreConfiguredActions(signalRServerBuilder);
 
             Configure<AbpEndpointRouterOptions>(options =>
             {
@@ -43,6 +55,8 @@ namespace Volo.Abp.AspNetCore.SignalR
 
                     foreach (var hubConfig in signalROptions.Hubs)
                     {
+                        routePatterns.AddIfNotContains(hubConfig.RoutePattern);
+
                         MapHubType(
                             hubConfig.HubType,
                             endpointContext.Endpoints,
@@ -57,6 +71,19 @@ namespace Volo.Abp.AspNetCore.SignalR
                         );
                     }
                 });
+            });
+
+            Configure<AbpAspNetCoreAuditingOptions>(options =>
+            {
+                foreach (var routePattern in routePatterns)
+                {
+                    options.IgnoredUrls.AddIfNotContains(x => routePattern.StartsWith(x), () => routePattern);
+                }
+            });
+
+            Configure<AbpAuditingOptions>(options =>
+            {
+                options.Contributors.Add(new AspNetCoreSignalRAuditLogContributor());
             });
         }
 

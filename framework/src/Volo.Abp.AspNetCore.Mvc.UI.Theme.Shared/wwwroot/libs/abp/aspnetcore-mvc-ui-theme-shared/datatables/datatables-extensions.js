@@ -1,4 +1,4 @@
-﻿var abp = abp || {};
+var abp = abp || {};
 (function ($) {
 
     var datatables = abp.utils.createNamespace(abp, 'libs.datatables');
@@ -30,7 +30,7 @@
         var htmlEncode = function (html) {
             return $('<div/>').text(html).html();
         }
-        
+
         var _createDropdownItem = function (record, fieldItem, tableInstance) {
             var $li = $('<li/>');
             var $a = $('<a/>');
@@ -40,9 +40,9 @@
             } else {
 
                 if (fieldItem.icon !== undefined && fieldItem.icon) {
-                    $a.append($("<i>").addClass("fa fa-" + fieldItem.icon + " mr-1"));
+                    $a.append($("<i>").addClass("fa fa-" + fieldItem.icon + " me-1"));
                 } else if (fieldItem.iconClass) {
-                    $a.append($("<i>").addClass(fieldItem.iconClass + " mr-1"));
+                    $a.append($("<i>").addClass(fieldItem.iconClass + " me-1"));
                 }
 
                 $a.append(htmlEncode(fieldItem.text));
@@ -78,27 +78,27 @@
                     return "";
                 }
 
-                var $button = $('<button type="button" class="btn btn-primary"></button>');
+                var $button = $('<button type="button" class="btn btn-primary abp-action-button"></button>');
 
                 if (firstItem.displayNameHtml) {
                     $button.html(firstItem.text);
                 } else {
                     if (firstItem.icon !== undefined && firstItem.icon) {
-                        $button.append($("<i>").addClass("fa fa-" + firstItem.icon + " mr-1"));
+                        $button.append($("<i>").addClass("fa fa-" + firstItem.icon + " me-1"));
                     } else if (firstItem.iconClass) {
-                        $button.append($("<i>").addClass(firstItem.iconClass + " mr-1"));
+                        $button.append($("<i>").addClass(firstItem.iconClass + " me-1"));
                     }
                     $button.append(htmlEncode(firstItem.text));
                 }
-                
+
                 if (firstItem.enabled && !firstItem.enabled({ record: record, table: tableInstance })) {
                     $button.addClass('disabled');
                 }
-                
+
                 if (firstItem.action) {
                     $button.click(function (e) {
                         e.preventDefault();
-    
+
                         if (!$(this).hasClass('disabled')) {
                             if (firstItem.confirmMessage) {
                                 abp.message.confirm(firstItem.confirmMessage({ record: record, table: tableInstance }))
@@ -119,27 +119,27 @@
 
             var $container = $('<div/>')
                 .addClass('dropdown')
-                .addClass('action-button');
+                .addClass('abp-action-button');
 
             var $dropdownButton = $('<button/>');
 
             if (field.icon !== undefined && field.icon) {
-                $dropdownButton.append($("<i>").addClass("fa fa-" + field.icon + " mr-1"));
+                $dropdownButton.append($("<i>").addClass("fa fa-" + field.icon + " me-1"));
             } else if (field.iconClass) {
-                $dropdownButton.append($("<i>").addClass(field.iconClass + " mr-1"));
+                $dropdownButton.append($("<i>").addClass(field.iconClass + " me-1"));
             } else {
-                $dropdownButton.append($("<i>").addClass("fa fa-cog mr-1"));
+                $dropdownButton.append($("<i>").addClass("fa fa-cog me-1"));
             }
 
             if (field.text) {
-                $dropdownButton.append(htmlEncode(fieldItem.text));
+                $dropdownButton.append(htmlEncode(field.text));
             } else {
                 $dropdownButton.append(htmlEncode(localize("DatatableActionDropdownDefaultText")));
             }
 
             $dropdownButton
                 .addClass('btn btn-primary btn-sm dropdown-toggle')
-                .attr('data-toggle', 'dropdown')
+                .attr('data-bs-toggle', 'dropdown')
                 .attr('aria-haspopup', 'true')
                 .attr('aria-expanded', 'false');
 
@@ -168,7 +168,7 @@
 
             if ($dropdownItemsContainer.find('li').length > 0) {
                 $dropdownItemsContainer.appendTo($container);
-                $dropdownButton.appendTo($container);
+                $dropdownButton.prependTo($container);
             }
 
             if ($dropdownItemsContainer.children().length === 0) {
@@ -217,7 +217,7 @@
 
         var renderRowActions = function (tableInstance, nRow, aData, iDisplayIndex, iDisplayIndexFull) {
             var columns;
-			
+
             if (tableInstance.aoColumns) {
                 columns = tableInstance.aoColumns;
             } else {
@@ -236,9 +236,11 @@
                     var $actionContainer = _createRowAction(aData, column.rowAction, tableInstance);
                     hideEmptyColumn($actionContainer, tableInstance, colIndex);
 
-                    var $actionButton = $(cells[colIndex]).find(".action-button");
-                    if ($actionButton.length === 0) {
-                        $(cells[colIndex]).append($actionContainer);
+                    if ($actionContainer) {
+                        var $actionButton = $(cells[colIndex]).find(".abp-action-button");
+                        if ($actionButton.length === 0) {
+                            $(cells[colIndex]).empty().append($actionContainer);
+                        }
                     }
                 }
             }
@@ -325,9 +327,20 @@
      * AJAX extension for datatables                                         *
      *************************************************************************/
     (function () {
-        datatables.createAjax = function (serverMethod, inputAction) {
+        datatables.createAjax = function (serverMethod, inputAction, responseCallback, cancelPreviousRequest) {
+            responseCallback = responseCallback || function(result) {
+                return {
+                    recordsTotal: result.totalCount,
+                    recordsFiltered: result.totalCount,
+                    data: result.items
+                };
+            }
+            var promise = null;
             return function (requestData, callback, settings) {
-                var input = inputAction ? inputAction(requestData, settings) : {};
+                var input = typeof inputAction === 'function'
+                    ? inputAction(requestData, settings)
+                    : (typeof inputAction === 'object' && inputAction)
+                        ? inputAction : {};
 
                 //Paging
                 if (settings.oInit.paging) {
@@ -355,15 +368,19 @@
                 //Text filter
                 if (requestData.search && requestData.search.value !== "") {
                     input.filter = requestData.search.value;
+                } else {
+                    input.filter = null;       
                 }
 
                 if (callback) {
-                    serverMethod(input).then(function (result) {
-                        callback({
-                            recordsTotal: result.totalCount,
-                            recordsFiltered: result.totalCount,
-                            data: result.items
-                        });
+                    if(cancelPreviousRequest && promise && promise.jqXHR) {
+                        promise.jqXHR.abort();
+                    }
+                    promise = serverMethod(input);
+                    promise.always(function () {
+                        promise = null;
+                    }).then(function (result) {
+                        callback(responseCallback(result));
                     });
                 }
             };
@@ -400,6 +417,10 @@
                     if (render) {
                         column.render = render;
                     }
+                }
+
+                if (!column.render) {
+                    column.render = $.fn.dataTable.render.text();
                 }
 
                 if (column.rowAction) {
@@ -445,11 +466,19 @@
     };
 
     datatables.defaultRenderers['date'] = function (value) {
-        return (ISOStringToDateTimeLocaleString())(value);
+        if(!value) {
+            return value;
+        } else {
+            return (ISOStringToDateTimeLocaleString())(value);
+        }
     };
 
     datatables.defaultRenderers['datetime'] = function (value) {
-        return (ISOStringToDateTimeLocaleString(luxon.DateTime.DATETIME_SHORT))(value);
+        if(!value) {
+            return value;
+        } else {
+            return (ISOStringToDateTimeLocaleString(luxon.DateTime.DATETIME_SHORT))(value);
+        }
     };
 
     /************************************************************************
@@ -460,7 +489,7 @@
 
     datatables.defaultConfigurations.scrollX = true;
 
-    datatables.defaultConfigurations.responsive = true; 
+    datatables.defaultConfigurations.responsive = true;
 
     datatables.defaultConfigurations.language = function () {
         return {
@@ -481,6 +510,6 @@
         };
     };
 
-    datatables.defaultConfigurations.dom = '<"dataTable_filters"f>rt<"row dataTable_footer"<"col-auto"l><"col-auto"i><"col"p>>';
+    datatables.defaultConfigurations.dom = '<"dataTable_filters row"f>rt<"row dataTable_footer"<"col-auto"l><"col-auto me-auto"i><"col-auto"p>>';
 
 })(jQuery);

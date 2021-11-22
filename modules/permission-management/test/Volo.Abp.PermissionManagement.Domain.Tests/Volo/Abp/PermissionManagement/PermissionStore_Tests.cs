@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using Volo.Abp.Authorization.Permissions;
@@ -24,11 +22,22 @@ namespace Volo.Abp.PermissionManagement
                 UserPermissionValueProvider.ProviderName,
                 PermissionTestDataBuilder.User1Id.ToString())).ShouldBeTrue();
 
-
             (await _permissionStore.IsGrantedAsync("MyPermission1NotExist",
                 UserPermissionValueProvider.ProviderName,
                 PermissionTestDataBuilder.User1Id.ToString())).ShouldBeFalse();
+        }
 
+        [Fact]
+        public async Task IsGranted_Multiple()
+        {
+            var result = await _permissionStore.IsGrantedAsync(new[] {"MyPermission1", "MyPermission1NotExist"},
+                UserPermissionValueProvider.ProviderName,
+                PermissionTestDataBuilder.User1Id.ToString());
+
+            result.Result.Count.ShouldBe(2);
+
+            result.Result.FirstOrDefault(x => x.Key == "MyPermission1").Value.ShouldBe(PermissionGrantResult.Granted);
+            result.Result.FirstOrDefault(x => x.Key == "MyPermission1NotExist").Value.ShouldBe(PermissionGrantResult.Undefined);
         }
     }
 }

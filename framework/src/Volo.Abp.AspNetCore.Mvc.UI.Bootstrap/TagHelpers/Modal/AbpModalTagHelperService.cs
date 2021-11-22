@@ -24,7 +24,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Modal
             var modal = GetModal(context, output, modalDialog);
 
             output.Content.SetHtmlContent(modal);
-        } 
+        }
 
         protected virtual TagBuilder GetModalContentElement(TagHelperContext context, TagHelperOutput output, TagHelperContent childContent)
         {
@@ -78,6 +78,12 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Modal
                 classNames.Append("modal-dialog-centered");
             }
 
+            if (TagHelper.Scrollable ?? false)
+            {
+                classNames.Append(" ");
+                classNames.Append("modal-dialog-scrollable");
+            }
+
             if (TagHelper.Size != AbpModalSize.Default)
             {
                 classNames.Append(" ");
@@ -96,7 +102,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Modal
         {
             if (TagHelper.Static == true)
             {
-                return "data-backdrop=\"static\" ";
+                return "data-bs-backdrop=\"static\" ";
             }
             return string.Empty;
         }
@@ -105,7 +111,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Modal
         {
             if (TagHelper.Static == true)
             {
-                builder.Attributes.Add("data-backdrop", "static");
+                builder.Attributes.Add("data-bs-backdrop", "static");
             }
         }
     }

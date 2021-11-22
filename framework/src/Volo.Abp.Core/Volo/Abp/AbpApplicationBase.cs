@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Internal;
+using Volo.Abp.Logging;
 using Volo.Abp.Modularity;
 
 namespace Volo.Abp
@@ -60,7 +63,7 @@ namespace Volo.Abp
         {
             //TODO: Shutdown if not done before?
         }
-        
+
         protected virtual void SetServiceProvider(IServiceProvider serviceProvider)
         {
             ServiceProvider = serviceProvider;
@@ -71,10 +74,29 @@ namespace Volo.Abp
         {
             using (var scope = ServiceProvider.CreateScope())
             {
+                WriteInitLogs(scope.ServiceProvider);
                 scope.ServiceProvider
                     .GetRequiredService<IModuleManager>()
                     .InitializeModules(new ApplicationInitializationContext(scope.ServiceProvider));
             }
+        }
+
+        protected virtual void WriteInitLogs(IServiceProvider serviceProvider)
+        {
+            var logger = serviceProvider.GetService<ILogger<AbpApplicationBase>>();
+            if (logger == null)
+            {
+                return;
+            }
+
+            var initLogger = serviceProvider.GetRequiredService<IInitLoggerFactory>().Create<AbpApplicationBase>();
+
+            foreach (var entry in initLogger.Entries)
+            {
+                logger.Log(entry.LogLevel, entry.EventId, entry.State, entry.Exception, entry.Formatter);
+            }
+
+            initLogger.Entries.Clear();
         }
 
         protected virtual IReadOnlyList<IAbpModuleDescriptor> LoadModules(IServiceCollection services, AbpApplicationCreationOptions options)
@@ -87,7 +109,7 @@ namespace Volo.Abp
                     options.PlugInSources
                 );
         }
-        
+
         //TODO: We can extract a new class for this
         protected virtual void ConfigureServices()
         {
@@ -115,6 +137,8 @@ namespace Volo.Abp
                 }
             }
 
+            var assemblies = new HashSet<Assembly>();
+
             //ConfigureServices
             foreach (var module in Modules)
             {
@@ -122,7 +146,12 @@ namespace Volo.Abp
                 {
                     if (!abpModule.SkipAutoServiceRegistration)
                     {
-                        Services.AddAssembly(module.Type.Assembly);
+                        var assembly = module.Type.Assembly;
+                        if (!assemblies.Contains(assembly))
+                        {
+                            Services.AddAssembly(assembly);
+                            assemblies.Add(assembly);
+                        }
                     }
                 }
 

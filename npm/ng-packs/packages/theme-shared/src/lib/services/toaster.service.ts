@@ -1,9 +1,13 @@
+import {
+  ContentProjectionService,
+  LocalizationParam,
+  PROJECTION_STRATEGY,
+  Strict,
+} from '@abp/ng.core';
 import { ComponentRef, Injectable } from '@angular/core';
-import { Toaster } from '../models';
 import { ReplaySubject } from 'rxjs';
-import { Config, ContentProjectionService, PROJECTION_STRATEGY, Strict } from '@abp/ng.core';
-import snq from 'snq';
 import { ToastContainerComponent } from '../components/toast-container/toast-container.component';
+import { Toaster } from '../models';
 
 @Injectable({
   providedIn: 'root',
@@ -15,13 +19,16 @@ export class ToasterService implements ToasterContract {
 
   private toasts = [] as Toaster.Toast[];
 
-  private containerComponentRef: ComponentRef<ToastContainerComponent>;
+  private containerComponentRef!: ComponentRef<ToastContainerComponent>;
 
   constructor(private contentProjectionService: ContentProjectionService) {}
 
   private setContainer() {
     this.containerComponentRef = this.contentProjectionService.projectContent(
-      PROJECTION_STRATEGY.AppendComponentToBody(ToastContainerComponent, { toasts$: this.toasts$ }),
+      PROJECTION_STRATEGY.AppendComponentToBody(ToastContainerComponent, {
+        toasts$: this.toasts$,
+        remove: this.remove,
+      }),
     );
 
     this.containerComponentRef.changeDetectorRef.detectChanges();
@@ -34,8 +41,8 @@ export class ToasterService implements ToasterContract {
    * @param options Spesific style or structural options for individual toast
    */
   info(
-    message: Config.LocalizationParam,
-    title?: Config.LocalizationParam,
+    message: LocalizationParam,
+    title?: LocalizationParam,
     options?: Partial<Toaster.ToastOptions>,
   ): Toaster.ToasterId {
     return this.show(message, title, 'info', options);
@@ -48,8 +55,8 @@ export class ToasterService implements ToasterContract {
    * @param options Spesific style or structural options for individual toast
    */
   success(
-    message: Config.LocalizationParam,
-    title?: Config.LocalizationParam,
+    message: LocalizationParam,
+    title?: LocalizationParam,
     options?: Partial<Toaster.ToastOptions>,
   ): Toaster.ToasterId {
     return this.show(message, title, 'success', options);
@@ -62,8 +69,8 @@ export class ToasterService implements ToasterContract {
    * @param options Spesific style or structural options for individual toast
    */
   warn(
-    message: Config.LocalizationParam,
-    title?: Config.LocalizationParam,
+    message: LocalizationParam,
+    title?: LocalizationParam,
     options?: Partial<Toaster.ToastOptions>,
   ): Toaster.ToasterId {
     return this.show(message, title, 'warning', options);
@@ -76,8 +83,8 @@ export class ToasterService implements ToasterContract {
    * @param options Spesific style or structural options for individual toast
    */
   error(
-    message: Config.LocalizationParam,
-    title?: Config.LocalizationParam,
+    message: LocalizationParam,
+    title?: LocalizationParam,
     options?: Partial<Toaster.ToastOptions>,
   ): Toaster.ToasterId {
     return this.show(message, title, 'error', options);
@@ -92,8 +99,8 @@ export class ToasterService implements ToasterContract {
    */
 
   show(
-    message: Config.LocalizationParam,
-    title: Config.LocalizationParam = null,
+    message: LocalizationParam,
+    title: LocalizationParam | undefined = undefined,
     severity: Toaster.Severity = 'neutral',
     options = {} as Partial<Toaster.ToastOptions>,
   ): Toaster.ToasterId {
@@ -114,10 +121,10 @@ export class ToasterService implements ToasterContract {
    * Removes the toast with given id.
    * @param id ID of the toast to be removed.
    */
-  remove(id: number): void {
-    this.toasts = this.toasts.filter(toast => snq(() => toast.options.id) !== id);
+  remove = (id: number) => {
+    this.toasts = this.toasts.filter(toast => toast.options?.id !== id);
     this.toasts$.next(this.toasts);
-  }
+  };
 
   /**
    * Removes all open toasts at once.
@@ -125,7 +132,7 @@ export class ToasterService implements ToasterContract {
   clear(containerKey?: string): void {
     this.toasts = !containerKey
       ? []
-      : this.toasts.filter(toast => snq(() => toast.options.containerKey) !== containerKey);
+      : this.toasts.filter(toast => toast.options?.containerKey !== containerKey);
     this.toasts$.next(this.toasts);
   }
 }

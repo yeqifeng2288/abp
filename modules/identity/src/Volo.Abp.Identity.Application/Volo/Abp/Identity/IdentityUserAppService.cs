@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using Volo.Abp.Application.Dtos;
+using Volo.Abp.Data;
 using Volo.Abp.ObjectExtending;
 
 namespace Volo.Abp.Identity
@@ -12,16 +14,19 @@ namespace Volo.Abp.Identity
     {
         protected IdentityUserManager UserManager { get; }
         protected IIdentityUserRepository UserRepository { get; }
-        public IIdentityRoleRepository RoleRepository { get; }
+        protected IIdentityRoleRepository RoleRepository { get; }
+        protected IOptions<IdentityOptions> IdentityOptions { get; }
 
         public IdentityUserAppService(
             IdentityUserManager userManager,
             IIdentityUserRepository userRepository,
-            IIdentityRoleRepository roleRepository)
+            IIdentityRoleRepository roleRepository,
+            IOptions<IdentityOptions> identityOptions)
         {
             UserManager = userManager;
             UserRepository = userRepository;
             RoleRepository = roleRepository;
+            IdentityOptions = identityOptions;
         }
 
         //TODO: [Authorize(IdentityPermissions.Users.Default)] should go the IdentityUserAppService class.
@@ -68,6 +73,8 @@ namespace Volo.Abp.Identity
         [Authorize(IdentityPermissions.Users.Create)]
         public virtual async Task<IdentityUserDto> CreateAsync(IdentityUserCreateDto input)
         {
+            await IdentityOptions.SetAsync();
+
             var user = new IdentityUser(
                 GuidGenerator.Create(),
                 input.UserName,
@@ -79,6 +86,7 @@ namespace Volo.Abp.Identity
 
             (await UserManager.CreateAsync(user, input.Password)).CheckErrors();
             await UpdateUserByInput(user, input);
+            (await UserManager.UpdateAsync(user)).CheckErrors();
 
             await CurrentUnitOfWork.SaveChangesAsync();
 
@@ -88,8 +96,11 @@ namespace Volo.Abp.Identity
         [Authorize(IdentityPermissions.Users.Update)]
         public virtual async Task<IdentityUserDto> UpdateAsync(Guid id, IdentityUserUpdateDto input)
         {
+            await IdentityOptions.SetAsync();
+
             var user = await UserManager.GetByIdAsync(id);
-            user.ConcurrencyStamp = input.ConcurrencyStamp;
+
+            user.SetConcurrencyStampIfNotNull(input.ConcurrencyStamp);
 
             (await UserManager.SetUserNameAsync(user, input.UserName)).CheckErrors();
 
@@ -166,7 +177,8 @@ namespace Volo.Abp.Identity
 
             user.Name = input.Name;
             user.Surname = input.Surname;
-
+            (await UserManager.UpdateAsync(user)).CheckErrors();
+            user.SetIsActive(input.IsActive);
             if (input.RoleNames != null)
             {
                 (await UserManager.SetRolesAsync(user, input.RoleNames)).CheckErrors();

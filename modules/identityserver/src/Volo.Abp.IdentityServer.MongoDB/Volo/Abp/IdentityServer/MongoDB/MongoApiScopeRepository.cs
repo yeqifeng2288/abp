@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -20,38 +20,50 @@ namespace Volo.Abp.IdentityServer.MongoDB
         {
         }
 
-        public async Task<ApiScope> GetByNameAsync(string scopeName, bool includeDetails = true, CancellationToken cancellationToken = default)
+        public async Task<ApiScope> FindByNameAsync(string scopeName, bool includeDetails = true, CancellationToken cancellationToken = default)
         {
-            return await GetMongoQueryable().FirstOrDefaultAsync(x => x.Name == scopeName, GetCancellationToken(cancellationToken));
+            return await (await GetMongoQueryableAsync(cancellationToken))
+                .OrderBy(x => x.Id)
+                .FirstOrDefaultAsync(x => x.Name == scopeName, GetCancellationToken(cancellationToken));
         }
 
         public async Task<List<ApiScope>> GetListByNameAsync(string[] scopeNames, bool includeDetails = false,
             CancellationToken cancellationToken = default)
         {
-            var query = from scope in GetMongoQueryable()
-                where scopeNames.Contains(scope.Name)
-                select scope;
-
-            return await query.ToListAsync(GetCancellationToken(cancellationToken));
+            return await (await GetMongoQueryableAsync(cancellationToken))
+                .Where(scope => scopeNames.Contains(scope.Name))
+                .OrderBy(scope => scope.Id)
+                .ToListAsync(GetCancellationToken(cancellationToken));
         }
 
         public async Task<List<ApiScope>> GetListAsync(string sorting, int skipCount, int maxResultCount, string filter = null, bool includeDetails = false,
             CancellationToken cancellationToken = default)
         {
-            return await GetMongoQueryable()
+            return await (await GetMongoQueryableAsync(cancellationToken))
                 .WhereIf(!filter.IsNullOrWhiteSpace(),
                     x => x.Name.Contains(filter) ||
                          x.Description.Contains(filter) ||
                          x.DisplayName.Contains(filter))
-                .OrderBy(sorting ?? nameof(ApiScope.Name))
+                .OrderBy(sorting.IsNullOrWhiteSpace() ? nameof(ApiScope.Name) : sorting)
                 .As<IMongoQueryable<ApiScope>>()
                 .PageBy<ApiScope, IMongoQueryable<ApiScope>>(skipCount, maxResultCount)
                 .ToListAsync(GetCancellationToken(cancellationToken));
         }
 
+        public async Task<long> GetCountAsync(string filter = null, CancellationToken cancellationToken = default)
+        {
+            return await (await GetMongoQueryableAsync(cancellationToken))
+                .WhereIf<ApiScope, IMongoQueryable<ApiScope>>(!filter.IsNullOrWhiteSpace(),
+                    x => x.Name.Contains(filter) ||
+                         x.Description.Contains(filter) ||
+                         x.DisplayName.Contains(filter))
+                .LongCountAsync(GetCancellationToken(cancellationToken));
+        }
+
         public async Task<bool> CheckNameExistAsync(string name, Guid? expectedId = null, CancellationToken cancellationToken = default)
         {
-            return await GetMongoQueryable().AnyAsync(x => x.Id != expectedId && x.Name == name, GetCancellationToken(cancellationToken));
+            return await (await GetMongoQueryableAsync(cancellationToken))
+                .AnyAsync(x => x.Id != expectedId && x.Name == name, GetCancellationToken(cancellationToken));
         }
     }
 }

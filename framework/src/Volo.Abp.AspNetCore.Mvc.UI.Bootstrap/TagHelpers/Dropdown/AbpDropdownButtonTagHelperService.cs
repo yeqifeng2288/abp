@@ -60,7 +60,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Dropdown
         protected virtual async Task<string> GetMainButtonAsync(TagHelperContext context, TagHelperOutput output, TagHelperContent content)
         {
             var abpButtonTagHelper = _serviceProvider.GetRequiredService<AbpButtonTagHelper>();
-            
+
             abpButtonTagHelper.Icon = TagHelper.Icon;
             abpButtonTagHelper.Text = TagHelper.Text;
             abpButtonTagHelper.IconType = TagHelper.IconType;
@@ -70,7 +70,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Dropdown
 
             var buttonTag = await abpButtonTagHelper.ProcessAndGetOutputAsync(attributes, context, "button", TagMode.StartTagAndEndTag);
 
-            buttonTag.PreContent.SetHtmlContent(content.GetContent());
+            buttonTag.PreContent.SetHtmlContent(content);
 
             if ((TagHelper.NavLink ?? false) || (TagHelper.Link ?? false))
             {
@@ -105,7 +105,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Dropdown
             if (TagHelper.DropdownStyle != DropdownStyle.Split)
             {
                 attributes.AddClass("dropdown-toggle");
-                attributes.Add("data-toggle", "dropdown");
+                attributes.Add("data-bs-toggle", "dropdown");
                 attributes.Add("aria-haspopup", "true");
                 attributes.Add("aria-expanded", "false");
             }
@@ -117,11 +117,11 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Dropdown
         {
             var attributes = new TagHelperAttributeList
             {
-                {"data-toggle", "dropdown"},
+                {"data-bs-toggle", "dropdown"},
                 {"aria-haspopup", "true"},
                 {"aria-expanded", "false"},
             };
-            
+
             attributes.AddClass("dropdown-toggle");
             attributes.AddClass("dropdown-toggle-split");
 

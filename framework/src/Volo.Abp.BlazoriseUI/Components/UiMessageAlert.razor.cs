@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Blazorise;
 using Microsoft.AspNetCore.Components;
-using Volo.Abp.AspNetCore.Components.WebAssembly;
+using Volo.Abp.AspNetCore.Components.Messages;
 
 namespace Volo.Abp.BlazoriseUI.Components
 {
@@ -87,7 +88,7 @@ namespace Volo.Abp.BlazoriseUI.Components
             UiMessageService.MessageReceived += OnMessageReceived;
         }
 
-        private void OnMessageReceived(object sender, UiMessageEventArgs e)
+        private async void OnMessageReceived(object sender, UiMessageEventArgs e)
         {
             MessageType = e.MessageType;
             Message = e.Message;
@@ -95,7 +96,7 @@ namespace Volo.Abp.BlazoriseUI.Components
             Options = e.Options;
             Callback = e.Callback;
 
-            ModalRef.Show();
+            await InvokeAsync(ModalRef.Show);
         }
 
         public void Dispose()
@@ -106,35 +107,52 @@ namespace Volo.Abp.BlazoriseUI.Components
             }
         }
 
-        protected Task OnOkClicked()
+        protected async Task OnOkClicked()
         {
-            ModalRef.Hide();
+            await InvokeAsync(async () =>
+            {
+                await Okayed.InvokeAsync(null);
 
-            return Okayed.InvokeAsync(null);
+                await ModalRef.Hide();
+            });
         }
 
-        protected Task OnConfirmClicked()
+        protected async Task OnConfirmClicked()
         {
-            ModalRef.Hide();
-
-            if (IsConfirmation && Callback != null)
+            await InvokeAsync(async () =>
             {
-                Callback.SetResult(true);
-            }
+                await ModalRef.Hide();
 
-            return Confirmed.InvokeAsync(null);
+                if (IsConfirmation && Callback != null)
+                {
+                    await InvokeAsync(() => Callback.SetResult(true));
+                }
+
+                await Confirmed.InvokeAsync(null);
+            });
         }
 
-        protected Task OnCancelClicked()
+        protected async Task OnCancelClicked()
         {
-            ModalRef.Hide();
-
-            if (IsConfirmation && Callback != null)
+            await InvokeAsync(async () =>
             {
-                Callback.SetResult(false);
-            }
+                await ModalRef.Hide();
 
-            return Canceled.InvokeAsync(null);
+                if (IsConfirmation && Callback != null)
+                {
+                    await InvokeAsync(() => Callback.SetResult(false));
+                }
+
+                await Canceled.InvokeAsync(null);
+            });
+        }
+
+        protected virtual Task OnModalClosing(ModalClosingEventArgs eventArgs)
+        {
+            eventArgs.Cancel = eventArgs.CloseReason == CloseReason.EscapeClosing
+                || eventArgs.CloseReason == CloseReason.FocusLostClosing;
+
+            return Task.CompletedTask;
         }
     }
 }

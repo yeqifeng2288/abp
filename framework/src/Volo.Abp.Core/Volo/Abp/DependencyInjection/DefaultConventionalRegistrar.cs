@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using JetBrains.Annotations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -26,7 +22,7 @@ namespace Volo.Abp.DependencyInjection
                 return;
             }
 
-            var exposedServiceTypes = ExposedServiceExplorer.GetExposedServices(type);
+            var exposedServiceTypes = GetExposedServiceTypes(type);
 
             TriggerServiceExposing(services, type, exposedServiceTypes);
 
@@ -52,92 +48,6 @@ namespace Volo.Abp.DependencyInjection
                     services.Add(serviceDescriptor);
                 }
             }
-        }
-
-        protected virtual ServiceDescriptor CreateServiceDescriptor(
-            Type implementationType,
-            Type exposingServiceType,
-            List<Type> allExposingServiceTypes,
-            ServiceLifetime lifeTime)
-        {
-            if (lifeTime.IsIn(ServiceLifetime.Singleton, ServiceLifetime.Scoped))
-            {
-                var redirectedType = GetRedirectedTypeOrNull(
-                    implementationType,
-                    exposingServiceType,
-                    allExposingServiceTypes
-                );
-
-                if (redirectedType != null)
-                {
-                    return ServiceDescriptor.Describe(
-                        exposingServiceType,
-                        provider => provider.GetService(redirectedType),
-                        lifeTime
-                    );
-                }
-            }
-
-            return ServiceDescriptor.Describe(
-                exposingServiceType,
-                implementationType,
-                lifeTime
-            );
-        }
-
-        protected virtual Type GetRedirectedTypeOrNull(
-            Type implementationType,
-            Type exposingServiceType,
-            List<Type> allExposingServiceTypes)
-        {
-            if (allExposingServiceTypes.Count < 2)
-            {
-                return null;
-            }
-
-            if (exposingServiceType == implementationType)
-            {
-                return null;
-            }
-
-            if (allExposingServiceTypes.Contains(implementationType))
-            {
-                return implementationType;
-            }
-
-            return allExposingServiceTypes.FirstOrDefault(
-                t => t != exposingServiceType && exposingServiceType.IsAssignableFrom(t)
-            );
-        }
-
-        protected virtual DependencyAttribute GetDependencyAttributeOrNull(Type type)
-        {
-            return type.GetCustomAttribute<DependencyAttribute>(true);
-        }
-
-        protected virtual ServiceLifetime? GetLifeTimeOrNull(Type type, [CanBeNull] DependencyAttribute dependencyAttribute)
-        {
-            return dependencyAttribute?.Lifetime ?? GetServiceLifetimeFromClassHierarcy(type);
-        }
-
-        protected virtual ServiceLifetime? GetServiceLifetimeFromClassHierarcy(Type type)
-        {
-            if (typeof(ITransientDependency).GetTypeInfo().IsAssignableFrom(type))
-            {
-                return ServiceLifetime.Transient;
-            }
-
-            if (typeof(ISingletonDependency).GetTypeInfo().IsAssignableFrom(type))
-            {
-                return ServiceLifetime.Singleton;
-            }
-
-            if (typeof(IScopedDependency).GetTypeInfo().IsAssignableFrom(type))
-            {
-                return ServiceLifetime.Scoped;
-            }
-
-            return null;
         }
     }
 }

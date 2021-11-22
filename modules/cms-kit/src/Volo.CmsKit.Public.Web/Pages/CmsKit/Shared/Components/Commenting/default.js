@@ -1,4 +1,4 @@
-﻿(function ($) {
+(function ($) {
 
     var l = abp.localization.getResource('CmsKit');
 
@@ -106,7 +106,8 @@
                     volo.cmsKit.public.comments.commentPublic.update(
                         formAsObject.id,
                         {
-                            text: formAsObject.commentText
+                            text: formAsObject.commentText,
+                            concurrencyStamp: formAsObject.commentConcurrencyStamp
                         }
                     ).then(function () {
                         widgetManager.refresh($widget);
@@ -121,6 +122,11 @@
                 $form.submit(function (e) {
                     e.preventDefault();
                     var formAsObject = $form.serializeFormToObject();
+
+                    if (formAsObject.repliedCommentId == ''){
+                        formAsObject.repliedCommentId = null;
+                    }
+
                     volo.cmsKit.public.comments.commentPublic.create(
                         $commentArea.attr('data-entity-type'),
                         $commentArea.attr('data-entity-id'),

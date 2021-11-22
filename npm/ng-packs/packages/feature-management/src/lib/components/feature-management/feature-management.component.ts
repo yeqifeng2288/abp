@@ -1,15 +1,14 @@
-import { TrackByService, GetAppConfiguration } from '@abp/ng.core';
-import { LocaleDirection } from '@abp/ng.theme.shared';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { Store } from '@ngxs/store';
-import { finalize } from 'rxjs/operators';
-import { FeatureManagement } from '../../models/feature-management';
-import { FeaturesService } from '../../proxy/feature-management/features.service';
+import { ConfigStateService, TrackByService } from '@abp/ng.core';
 import {
   FeatureDto,
   FeatureGroupDto,
+  FeaturesService,
   UpdateFeatureDto,
-} from '../../proxy/feature-management/models';
+} from '@abp/ng.feature-management/proxy';
+import { LocaleDirection } from '@abp/ng.theme.shared';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { finalize } from 'rxjs/operators';
+import { FeatureManagement } from '../../models/feature-management';
 
 enum ValueTypes {
   ToggleStringValueType = 'ToggleStringValueType',
@@ -25,7 +24,8 @@ enum ValueTypes {
 export class FeatureManagementComponent
   implements
     FeatureManagement.FeatureManagementComponentInputs,
-    FeatureManagement.FeatureManagementComponentOutputs {
+    FeatureManagement.FeatureManagementComponentOutputs
+{
   @Input()
   providerKey: string;
 
@@ -64,7 +64,7 @@ export class FeatureManagementComponent
   constructor(
     public readonly track: TrackByService,
     protected service: FeaturesService,
-    protected store: Store,
+    protected configState: ConfigStateService,
   ) {}
 
   openModal() {
@@ -77,6 +77,7 @@ export class FeatureManagementComponent
 
   getFeatures() {
     this.service.get(this.providerName, this.providerKey).subscribe(res => {
+      if (!res.groups?.length) return;
       this.groups = res.groups.map(({ name, displayName }) => ({ name, displayName }));
       this.selectedGroupDisplayName = this.groups[0].displayName;
       this.features = res.groups.reduce(
@@ -97,7 +98,7 @@ export class FeatureManagementComponent
     Object.keys(this.features).forEach(key => {
       this.features[key].forEach(feature => {
         if (feature.value !== feature.initialValue)
-          changedFeatures.push({ name: feature.name, value: feature.value });
+          changedFeatures.push({ name: feature.name, value: `${feature.value}` });
       });
     });
 
@@ -115,7 +116,7 @@ export class FeatureManagementComponent
 
         if (!this.providerKey) {
           // to refresh host's features
-          this.store.dispatch(new GetAppConfiguration());
+          this.configState.refreshAppState().subscribe();
         }
       });
   }

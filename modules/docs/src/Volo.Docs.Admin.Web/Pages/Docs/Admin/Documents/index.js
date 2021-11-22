@@ -1,4 +1,4 @@
-﻿$(function () {
+$(function () {
     var l = abp.localization.getResource('Docs');
     var service = window.volo.docs.admin.documentsAdmin;
 
@@ -51,14 +51,11 @@
                                 visible: abp.auth.isGranted(
                                     'Docs.Admin.Documents'
                                 ),
-                                confirmMessage: function (data) {
-                                    return l('RemoveFromCacheConfirmation');
-                                },
                                 action: function (data) {
                                     service
                                         .removeFromCache(data.record.id)
                                         .then(function () {
-                                            abp.message.success(l('RemovedFromCache'));
+                                            abp.notify.success(l('RemovedFromCache'));
                                             dataTable.ajax.reload();
                                         });
                                 },

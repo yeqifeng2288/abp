@@ -1,4 +1,4 @@
-# ASP.NET Core MVC / Razor Pages Layout Hooks
+# ASP.NET Core MVC / Razor Pages: Layout Hooks
 
 ABP Framework theming system places the page layout into the [theme](Theming.md) NuGet packages. That means the final application doesn't include a `Layout.cshtml`, so you can't directly change the layout code to customize it.
 
@@ -98,7 +98,7 @@ These names are defined in the `StandardLayouts` class as constants. You can def
 
 ### Layout Location
 
-You can find the layout files [here](https://github.com/abpframework/abp/tree/dev/framework/src/Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic/Themes/Basic/Layouts) for the basic theme. You can take them as references to build your own layouts or you can override them if necessary.
+You can find the layout files [here](https://github.com/abpframework/abp/blob/dev/modules/basic-theme/src/Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic/Themes/Basic/Layouts) for the basic theme. You can take them as references to build your own layouts or you can override them if necessary.
 
 ## See Also
 

@@ -13,9 +13,9 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Tab
         {
             SetPlaceholderForNameIfNotProvided();
 
-            var innerContent = await output.GetChildContentAsync();
+            var childContent = await output.GetChildContentAsync();
             var tabHeader = GetTabHeaderItem(context, output);
-            var tabContent = GetTabContentItem(context, output, innerContent.GetContent());
+            var tabContent = GetTabContentItem(context, output, childContent);
 
             var tabHeaderItems = context.GetValue<List<TabItem>>(TabItems);
 
@@ -43,7 +43,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Tab
                 anchor.AddCssClass("dropdown-item " + classAttributesAsString);
                 anchor.Attributes.Add("id", id);
                 anchor.Attributes.Add("href", "#" + link);
-                anchor.Attributes.Add("data-toggle", "tab");
+                anchor.Attributes.Add("data-bs-toggle", "tab");
                 anchor.Attributes.Add("role", "tab");
                 anchor.Attributes.Add("aria-controls", control);
                 anchor.Attributes.Add("aria-selected", "false");
@@ -53,7 +53,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Tab
                     anchor.Attributes.Add(attr.Name, attr.Value.ToString());
                 }
 
-                anchor.InnerHtml.Append(title);
+                anchor.InnerHtml.AppendHtml(title);
 
                 return anchor.ToHtmlString();
             }
@@ -62,7 +62,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Tab
                 var anchor = new TagBuilder("a");
                 anchor.AddCssClass("nav-link " + classAttributesAsString + " " + AbpTabItemActivePlaceholder);
                 anchor.Attributes.Add("id", id);
-                anchor.Attributes.Add("data-toggle", TabItemsDataTogglePlaceHolder);
+                anchor.Attributes.Add("data-bs-toggle", TabItemsDataTogglePlaceHolder);
                 anchor.Attributes.Add("href", "#" + link);
                 anchor.Attributes.Add("role", "tab");
                 anchor.Attributes.Add("aria-controls", control);
@@ -73,7 +73,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Tab
                     anchor.Attributes.Add(attr.Name, attr.Value.ToString());
                 }
 
-                anchor.InnerHtml.Append(title);
+                anchor.InnerHtml.AppendHtml(title);
 
                 var listItem = new TagBuilder("li");
                 listItem.AddCssClass("nav-item");
@@ -83,7 +83,7 @@ namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Tab
             }
         }
 
-        protected virtual string GetTabContentItem(TagHelperContext context, TagHelperOutput output, string content)
+        protected virtual string GetTabContentItem(TagHelperContext context, TagHelperOutput output, TagHelperContent content)
         {
             var headerId = TagHelper.Name + "-tab";
             var id = TagHelper.Name;

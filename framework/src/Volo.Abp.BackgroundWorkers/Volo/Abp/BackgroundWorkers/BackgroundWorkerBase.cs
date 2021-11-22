@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Volo.Abp.DependencyInjection;
 
 namespace Volo.Abp.BackgroundWorkers
 {
@@ -13,33 +13,23 @@ namespace Volo.Abp.BackgroundWorkers
     public abstract class BackgroundWorkerBase : IBackgroundWorker
     {
         //TODO: Add UOW, Localization and other useful properties..?
+
+        public IAbpLazyServiceProvider LazyServiceProvider { get; set; }
+
         public IServiceProvider ServiceProvider { get; set; }
-        protected readonly object ServiceProviderLock = new object();
 
-        protected TService LazyGetRequiredService<TService>(ref TService reference)
-            => LazyGetRequiredService(typeof(TService), ref reference);
+        protected ILoggerFactory LoggerFactory => LazyServiceProvider.LazyGetRequiredService<ILoggerFactory>();
 
-        protected TRef LazyGetRequiredService<TRef>(Type serviceType, ref TRef reference)
+        protected ILogger Logger => LazyServiceProvider.LazyGetService<ILogger>(provider => LoggerFactory?.CreateLogger(GetType().FullName) ?? NullLogger.Instance);
+        
+        protected CancellationTokenSource StoppingTokenSource { get; }
+        protected CancellationToken StoppingToken { get; }
+
+        public BackgroundWorkerBase()
         {
-            if (reference == null)
-            {
-                lock (ServiceProviderLock)
-                {
-                    if (reference == null)
-                    {
-                        reference = (TRef)ServiceProvider.GetRequiredService(serviceType);
-                    }
-                }
-            }
-
-            return reference;
+            StoppingTokenSource = new CancellationTokenSource();
+            StoppingToken = StoppingTokenSource.Token;
         }
-
-        protected ILoggerFactory LoggerFactory => LazyGetRequiredService(ref _loggerFactory);
-        private ILoggerFactory _loggerFactory;
-
-        protected ILogger Logger => _lazyLogger.Value;
-        private Lazy<ILogger> _lazyLogger => new Lazy<ILogger>(() => LoggerFactory?.CreateLogger(GetType().FullName) ?? NullLogger.Instance, true);
 
         public virtual Task StartAsync(CancellationToken cancellationToken = default)
         {
@@ -50,6 +40,8 @@ namespace Volo.Abp.BackgroundWorkers
         public virtual Task StopAsync(CancellationToken cancellationToken = default)
         {
             Logger.LogDebug("Stopped background worker: " + ToString());
+            StoppingTokenSource.Cancel();
+            StoppingTokenSource.Dispose();
             return Task.CompletedTask;
         }
 
