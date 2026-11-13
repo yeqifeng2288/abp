@@ -1,38 +1,42 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Guids;
 using Volo.Abp.MultiTenancy;
 
-namespace Volo.Abp.PermissionManagement
+namespace Volo.Abp.PermissionManagement;
+
+public abstract class PermissionManagementProvider : IPermissionManagementProvider
 {
-    public abstract class PermissionManagementProvider : IPermissionManagementProvider
+    public abstract string Name { get; }
+
+    protected IPermissionGrantRepository PermissionGrantRepository { get; }
+
+    protected IGuidGenerator GuidGenerator { get; }
+
+    protected ICurrentTenant CurrentTenant { get; }
+
+    protected PermissionManagementProvider(
+        IPermissionGrantRepository permissionGrantRepository,
+        IGuidGenerator guidGenerator,
+        ICurrentTenant currentTenant)
     {
-        public abstract string Name { get; }
+        PermissionGrantRepository = permissionGrantRepository;
+        GuidGenerator = guidGenerator;
+        CurrentTenant = currentTenant;
+    }
 
-        protected IPermissionGrantRepository PermissionGrantRepository { get; }
+    public virtual async Task<PermissionValueProviderGrantInfo> CheckAsync(string name, string providerName, string providerKey)
+    {
+        var multiplePermissionValueProviderGrantInfo = await CheckAsync(new[] { name }, providerName, providerKey);
 
-        protected IGuidGenerator GuidGenerator { get; }
+        return multiplePermissionValueProviderGrantInfo.Result.First().Value;
+    }
 
-        protected ICurrentTenant CurrentTenant { get; }
-
-        protected PermissionManagementProvider(
-            IPermissionGrantRepository permissionGrantRepository,
-            IGuidGenerator guidGenerator,
-            ICurrentTenant currentTenant)
-        {
-            PermissionGrantRepository = permissionGrantRepository;
-            GuidGenerator = guidGenerator;
-            CurrentTenant = currentTenant;
-        }
-
-        public virtual async Task<PermissionValueProviderGrantInfo> CheckAsync(string name, string providerName, string providerKey)
-        {
-            var multiplePermissionValueProviderGrantInfo = await CheckAsync(new[] {name}, providerName, providerKey);
-
-            return multiplePermissionValueProviderGrantInfo.Result.First().Value;
-        }
-
-        public virtual async Task<MultiplePermissionValueProviderGrantInfo> CheckAsync(string[] names, string providerName, string providerKey)
+    public virtual async Task<MultiplePermissionValueProviderGrantInfo> CheckAsync(string[] names, string providerName, string providerKey)
+    {
+        using (PermissionGrantRepository.DisableTracking())
         {
             var multiplePermissionValueProviderGrantInfo = new MultiplePermissionValueProviderGrantInfo(names);
             if (providerName != Name)
@@ -41,51 +45,43 @@ namespace Volo.Abp.PermissionManagement
             }
 
             var permissionGrants = await PermissionGrantRepository.GetListAsync(names, providerName, providerKey);
+            var grantedPermissionNames = new HashSet<string>(permissionGrants.Select(x => x.Name));
 
             foreach (var permissionName in names)
             {
-                var isGrant = permissionGrants.Any(x => x.Name == permissionName);
+                var isGrant = grantedPermissionNames.Contains(permissionName);
                 multiplePermissionValueProviderGrantInfo.Result[permissionName] = new PermissionValueProviderGrantInfo(isGrant, providerKey);
             }
 
             return multiplePermissionValueProviderGrantInfo;
         }
+    }
 
-        public virtual Task SetAsync(string name, string providerKey, bool isGranted)
+    public virtual Task SetAsync(string name, string providerKey, bool isGranted)
+    {
+        return isGranted
+            ? GrantAsync(name, providerKey)
+            : RevokeAsync(name, providerKey);
+    }
+
+    protected virtual async Task GrantAsync(string name, string providerKey)
+    {
+        var permissionGrant = await PermissionGrantRepository.FindAsync(name, Name, providerKey);
+        if (permissionGrant != null)
         {
-            return isGranted
-                ? GrantAsync(name, providerKey)
-                : RevokeAsync(name, providerKey);
+            return;
         }
 
-        protected virtual async Task GrantAsync(string name, string providerKey)
+        permissionGrant = new PermissionGrant(GuidGenerator.Create(), name, Name, providerKey, CurrentTenant.Id);
+        await PermissionGrantRepository.InsertAsync(permissionGrant, true);
+    }
+
+    protected virtual async Task RevokeAsync(string name, string providerKey)
+    {
+        var permissionGrants = await PermissionGrantRepository.GetListAsync(new[] { name }, Name, providerKey);
+        foreach (var permissionGrant in permissionGrants)
         {
-            var permissionGrant = await PermissionGrantRepository.FindAsync(name, Name, providerKey);
-            if (permissionGrant != null)
-            {
-                return;
-            }
-
-            await PermissionGrantRepository.InsertAsync(
-                new PermissionGrant(
-                    GuidGenerator.Create(),
-                    name,
-                    Name,
-                    providerKey,
-                    CurrentTenant.Id
-                )
-            );
-        }
-
-        protected virtual async Task RevokeAsync(string name, string providerKey)
-        {
-            var permissionGrant = await PermissionGrantRepository.FindAsync(name, Name, providerKey);
-            if (permissionGrant == null)
-            {
-                return;
-            }
-
-            await PermissionGrantRepository.DeleteAsync(permissionGrant);
+            await PermissionGrantRepository.DeleteAsync(permissionGrant, true);
         }
     }
 }

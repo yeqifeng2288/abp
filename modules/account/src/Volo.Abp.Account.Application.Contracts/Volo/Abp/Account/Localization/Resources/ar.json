@@ -1,6 +1,7 @@
 {
   "culture": "ar",
   "texts": {
+    "Menu:Account": "حساب",
     "UserName": "اسم المستخدم",
     "EmailAddress": "البريد الإلكتروني",
     "UserNameOrEmailAddress": "اسم المستخدم أو البريد الإلكتروني",
@@ -10,6 +11,8 @@
     "UserLockedOutMessage": "تم قفل حساب المستخدم بسبب محاولات تسجيل الدخول غير الصالحة. يرجى الانتظار بعض الوقت والمحاولة مرة أخرى.",
     "InvalidUserNameOrPassword": "اسم مستخدم أو كلمة مرور غير صالحة!",
     "LoginIsNotAllowed": "لا يسمح لك بتسجيل الدخول! حسابك غير نشط أو يحتاج إلى تأكيد بريدك الإلكتروني/رقم هاتفك.",
+    "ExternalLoginPasswordChangeRequired": "لا يسمح لك بتسجيل الدخول! يجب تغيير كلمة المرور الخاصة بك، لكن ذلك غير ممكن عند تسجيل الدخول الخارجي. يرجى الاتصال بالمسؤول.",
+    "RegisteredButLoginIsNotAllowed": "تم إنشاء حسابك، لكن لا يسمح لك بتسجيل الدخول بعد!",
     "SelfRegistrationDisabledMessage": "تم تعطيل التسجيل الذاتي لهذا التطبيق. يرجى الاتصال بمسؤول التطبيق لتسجيل مستخدم جديد.",
     "LocalLoginDisabledMessage": "تسجيل الدخول المحلي معطّل لهذا التطبيق.",
     "Login": "دخول",
@@ -33,8 +36,11 @@
     "DisplayName:PhoneNumber": "رقم الهاتف",
     "PersonalSettings": "الإعدادات الشخصية",
     "PersonalSettingsSaved": "تم حفظ الإعدادات الشخصية",
+    "PersonalSettingsChangedConfirmationModalTitle": "تغيرت المعلومات الشخصية",
+    "PersonalSettingsChangedConfirmationModalDescription": "إذا كنت تريد تطبيق هذه التغييرات، عليك تسجيل الدخول. هل ترغب بالخروج؟",
     "PasswordChanged": "تم تغيير كلمة المرور",
     "NewPasswordConfirmFailed": "يرجى تأكيد كلمة المرور الجديدة.",
+    "NewPasswordSameAsOld": "يجب أن تكون كلمة المرور الجديدة مختلفة عن كلمة المرور الحالية.",
     "Manage": "إدارة",
     "MyAccount": "حسابي",
     "DisplayName:Abp.Account.IsSelfRegistrationEnabled": "هل تم تمكين التسجيل الذاتي",
@@ -62,6 +68,10 @@
     "PasswordResetInfoInEmail": "لقد تلقينا طلب استرداد الحساب! إذا بدأت هذا الطلب ، فانقر فوق الارتباط التالي لإعادة تعيين كلمة المرور الخاصة بك.",
     "ResetMyPassword": "إعادة تعيين كلمة المرور الخاصة بي",
     "AccessDenied": "تم الرفض!",
-    "AccessDeniedMessage": "ليس لديك حق الوصول إلى هذا المورد."
+    "AccessDeniedMessage": "ليس لديك حق الوصول إلى هذا المورد.",
+    "OrRegisterWith": "أو التسجيل بـ:",
+    "RegisterUsingYourProviderAccount": "قم بالتسجيل باستخدام حسابك في {0}",
+    "RequireMigrateSeedTitle": "تعذر العثور على المستخدم المسؤول",
+    "RequireMigrateSeedMessage": "يرجى التأكد من تنفيذ seed قاعدة البيانات. راجع <a target=\"_blank\" href=\"https://abp.io/kb/0003\">الوثائق</a> للحلول الممكنة."
   }
 }

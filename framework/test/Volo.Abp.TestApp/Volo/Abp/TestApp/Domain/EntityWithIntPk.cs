@@ -1,22 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Volo.Abp.Domain.Entities;
+﻿using Volo.Abp.Domain.Entities;
 
-namespace Volo.Abp.TestApp.Domain
+namespace Volo.Abp.TestApp.Domain;
+
+public class EntityWithIntPk : AggregateRoot<int>
 {
-    public class EntityWithIntPk : AggregateRoot<int>
+    public string Name { get; set; }
+
+    public EntityWithIntPk()
     {
-        public string Name { get; set; }
 
-        public EntityWithIntPk()
-        {
-            
-        }
+    }
 
-        public EntityWithIntPk(string name)
-        {
-            Name = name;
-        }
+    public EntityWithIntPk(string name)
+    {
+        Name = name;
     }
 }

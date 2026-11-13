@@ -21,7 +21,7 @@ namespace Volo.Docs.EntityFrameworkCore
 
             builder.Entity<Project>(b =>
             {
-                b.ToTable(DocsDbProperties.DbTablePrefix + "Projects", DocsDbProperties.DbSchema);
+                b.ToTable(AbpDocsDbProperties.DbTablePrefix + "Projects", AbpDocsDbProperties.DbSchema);
 
                 b.ConfigureByConvention();
 
@@ -31,13 +31,17 @@ namespace Volo.Docs.EntityFrameworkCore
                 b.Property(x => x.NavigationDocumentName).IsRequired().HasMaxLength(ProjectConsts.MaxNavigationDocumentNameLength);
                 b.Property(x => x.ParametersDocumentName).IsRequired().HasMaxLength(ProjectConsts.MaxParametersDocumentNameLength);
                 b.Property(x => x.LatestVersionBranchName).HasMaxLength(ProjectConsts.MaxLatestVersionBranchNameLength);
+                
+                b.HasMany(x => x.PdfFiles).WithOne()
+                    .HasForeignKey(x => new { x.ProjectId })
+                    .IsRequired();
 
                 b.ApplyObjectExtensionMappings();
             });
 
             builder.Entity<Document>(b =>
             {
-                b.ToTable(DocsDbProperties.DbTablePrefix + "Documents", DocsDbProperties.DbSchema);
+                b.ToTable(AbpDocsDbProperties.DbTablePrefix + "Documents", AbpDocsDbProperties.DbSchema);
 
                 b.ConfigureByConvention();
 
@@ -61,11 +65,22 @@ namespace Volo.Docs.EntityFrameworkCore
 
             builder.Entity<DocumentContributor>(b =>
             {
-                b.ToTable(DocsDbProperties.DbTablePrefix + "DocumentContributors", DocsDbProperties.DbSchema);
+                b.ToTable(AbpDocsDbProperties.DbTablePrefix + "DocumentContributors", AbpDocsDbProperties.DbSchema);
 
                 b.ConfigureByConvention();
 
                 b.HasKey(x => new { x.DocumentId, x.Username });
+
+                b.ApplyObjectExtensionMappings();
+            });
+            
+            builder.Entity<ProjectPdfFile>(b =>
+            {
+                b.ToTable(AbpDocsDbProperties.DbTablePrefix + "ProjectPdfFiles", AbpDocsDbProperties.DbSchema);
+
+                b.ConfigureByConvention();
+
+                b.HasKey(x => new { x.ProjectId, x.FileName });
 
                 b.ApplyObjectExtensionMappings();
             });

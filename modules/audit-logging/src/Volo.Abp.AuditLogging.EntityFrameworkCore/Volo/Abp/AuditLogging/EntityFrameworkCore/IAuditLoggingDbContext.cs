@@ -2,11 +2,12 @@
 using Volo.Abp.Data;
 using Volo.Abp.EntityFrameworkCore;
 
-namespace Volo.Abp.AuditLogging.EntityFrameworkCore
+namespace Volo.Abp.AuditLogging.EntityFrameworkCore;
+
+[ConnectionStringName(AbpAuditLoggingDbProperties.ConnectionStringName)]
+public interface IAuditLoggingDbContext : IEfCoreDbContext
 {
-    [ConnectionStringName(AbpAuditLoggingDbProperties.ConnectionStringName)]
-    public interface IAuditLoggingDbContext : IEfCoreDbContext
-    {
-        DbSet<AuditLog> AuditLogs { get; }
-    }
+    DbSet<AuditLog> AuditLogs { get; }
+
+    DbSet<AuditLogExcelFile> AuditLogExcelFiles { get; }
 }

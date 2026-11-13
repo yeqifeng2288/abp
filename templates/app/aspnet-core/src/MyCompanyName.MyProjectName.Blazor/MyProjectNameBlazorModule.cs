@@ -1,104 +1,63 @@
-﻿using System;
-using System.Net.Http;
-using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
-using IdentityModel;
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using MyCompanyName.MyProjectName.Blazor.Menus;
-using Volo.Abp.AspNetCore.Components.Web.BasicTheme.Themes.Basic;
-using Volo.Abp.AspNetCore.Components.Web.Theming.Routing;
-using Volo.Abp.Autofac.WebAssembly;
-using Volo.Abp.AutoMapper;
+using Microsoft.Extensions.Hosting;
+using MyCompanyName.MyProjectName.Blazor.Client;
+using Volo.Abp;
+using Volo.Abp.AspNetCore.Components.WebAssembly.MudBlazorBasicTheme.Bundling;
+using Volo.Abp.AspNetCore.Components.WebAssembly.WebApp;
+using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
+using Volo.Abp.Autofac;
 using Volo.Abp.Modularity;
-using Volo.Abp.UI.Navigation;
-using Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme;
-using Volo.Abp.Identity.Blazor.WebAssembly;
-using Volo.Abp.SettingManagement.Blazor.WebAssembly;
-using Volo.Abp.TenantManagement.Blazor.WebAssembly;
 
-namespace MyCompanyName.MyProjectName.Blazor
+namespace MyCompanyName.MyProjectName.Blazor;
+
+[DependsOn(
+    typeof(AbpAutofacModule),
+    typeof(AbpAspNetCoreMvcUiBundlingModule),
+    typeof(AbpAspNetCoreComponentsWebAssemblyMudBlazorBasicThemeBundlingModule)
+)]
+public class MyProjectNameBlazorModule : AbpModule
 {
-    [DependsOn(
-        typeof(AbpAutofacWebAssemblyModule),
-        typeof(MyProjectNameHttpApiClientModule),
-        typeof(AbpAspNetCoreComponentsWebAssemblyBasicThemeModule),
-        typeof(AbpIdentityBlazorWebAssemblyModule),
-        typeof(AbpTenantManagementBlazorWebAssemblyModule),
-        typeof(AbpSettingManagementBlazorWebAssemblyModule)
-    )]
-    public class MyProjectNameBlazorModule : AbpModule
+    public override void ConfigureServices(ServiceConfigurationContext context)
     {
-        public override void ConfigureServices(ServiceConfigurationContext context)
+        //https://github.com/dotnet/aspnetcore/issues/52530
+        Configure<RouteOptions>(options =>
         {
-            var environment = context.Services.GetSingletonInstance<IWebAssemblyHostEnvironment>();
-            var builder = context.Services.GetSingletonInstance<WebAssemblyHostBuilder>();
+            options.SuppressCheckForUnhandledSecurityMetadata = true;
+        });
 
-            ConfigureAuthentication(builder);
-            ConfigureHttpClient(context, environment);
-            ConfigureBlazorise(context);
-            ConfigureRouter(context);
-            ConfigureUI(builder);
-            ConfigureMenu(context);
-            ConfigureAutoMapper(context);
+        // Add services to the container.
+        context.Services.AddRazorComponents()
+            .AddInteractiveWebAssemblyComponents();
+    }
+
+    public override void OnApplicationInitialization(ApplicationInitializationContext context)
+    {
+        var env = context.GetEnvironment();
+        var app = context.GetApplicationBuilder();
+
+        // Configure the HTTP request pipeline.
+        if (env.IsDevelopment())
+        {
+            app.UseWebAssemblyDebugging();
+        }
+        else
+        {
+            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+            app.UseHsts();
         }
 
-        private void ConfigureRouter(ServiceConfigurationContext context)
-        {
-            Configure<AbpRouterOptions>(options =>
-            {
-                options.AppAssembly = typeof(MyProjectNameBlazorModule).Assembly;
-            });
-        }
+        app.UseHttpsRedirection();
+        app.MapAbpStaticAssets();
+        app.UseRouting();
+        app.UseAntiforgery();
 
-        private void ConfigureMenu(ServiceConfigurationContext context)
+        app.UseConfiguredEndpoints(builder =>
         {
-            Configure<AbpNavigationOptions>(options =>
-            {
-                options.MenuContributors.Add(new MyProjectNameMenuContributor(context.Services.GetConfiguration()));
-            });
-        }
-
-        private void ConfigureBlazorise(ServiceConfigurationContext context)
-        {
-            context.Services
-                .AddBootstrap5Providers()
-                .AddFontAwesomeIcons();
-        }
-
-        private static void ConfigureAuthentication(WebAssemblyHostBuilder builder)
-        {
-            builder.Services.AddOidcAuthentication(options =>
-            {
-                builder.Configuration.Bind("AuthServer", options.ProviderOptions);
-                options.UserOptions.RoleClaim = JwtClaimTypes.Role;
-                options.ProviderOptions.DefaultScopes.Add("MyProjectName");
-                options.ProviderOptions.DefaultScopes.Add("role");
-                options.ProviderOptions.DefaultScopes.Add("email");
-                options.ProviderOptions.DefaultScopes.Add("phone");
-            });
-        }
-
-        private static void ConfigureUI(WebAssemblyHostBuilder builder)
-        {
-            builder.RootComponents.Add<App>("#ApplicationContainer");
-        }
-
-        private static void ConfigureHttpClient(ServiceConfigurationContext context, IWebAssemblyHostEnvironment environment)
-        {
-            context.Services.AddTransient(sp => new HttpClient
-            {
-                BaseAddress = new Uri(environment.BaseAddress)
-            });
-        }
-
-        private void ConfigureAutoMapper(ServiceConfigurationContext context)
-        {
-            Configure<AbpAutoMapperOptions>(options =>
-            {
-                options.AddMaps<MyProjectNameBlazorModule>();
-            });
-        }
+            builder.MapRazorComponents<App>()
+                .AddInteractiveWebAssemblyRenderMode()
+                .AddAdditionalAssemblies(WebAppAdditionalAssembliesHelper.GetAssemblies<MyProjectNameBlazorClientModule>());
+        });
     }
 }

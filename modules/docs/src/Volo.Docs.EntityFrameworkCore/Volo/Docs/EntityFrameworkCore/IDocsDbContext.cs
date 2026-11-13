@@ -8,7 +8,7 @@ using Volo.Docs.Projects;
 namespace Volo.Docs.EntityFrameworkCore
 {
     [IgnoreMultiTenancy]
-    [ConnectionStringName(DocsDbProperties.ConnectionStringName)]
+    [ConnectionStringName(AbpDocsDbProperties.ConnectionStringName)]
     public interface IDocsDbContext : IEfCoreDbContext
     {
         DbSet<Project> Projects { get; }
@@ -16,5 +16,7 @@ namespace Volo.Docs.EntityFrameworkCore
         DbSet<Document> Documents { get; }
 
         DbSet<DocumentContributor> DocumentContributors { get; }
+        
+        DbSet<ProjectPdfFile> ProjectPdfFiles { get; set; }
     }
 }

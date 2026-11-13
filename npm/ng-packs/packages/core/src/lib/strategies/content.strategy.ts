@@ -1,5 +1,7 @@
-import { ContentSecurityStrategy, CONTENT_SECURITY_STRATEGY } from './content-security.strategy';
-import { DomStrategy, DOM_STRATEGY } from './dom.strategy';
+import { CONTENT_SECURITY_STRATEGY, ContentSecurityStrategy } from './content-security.strategy';
+import { DOM_STRATEGY, DomStrategy } from './dom.strategy';
+import { inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 
 export type ElementOptions<T extends HTMLScriptElement | HTMLStyleElement = any> = Partial<{
   [key in keyof T]: T[key];
@@ -19,7 +21,11 @@ export abstract class ContentStrategy<T extends HTMLScriptElement | HTMLStyleEle
     const element = this.createElement();
 
     if (this.options && Object.keys(this.options).length > 0) {
-      Object.keys(this.options).forEach(key => (element[key] = this.options[key]));
+      (Object.keys(this.options) as Array<keyof ElementOptions<T>>).forEach(key => {
+        if (this.options[key]) {
+          element[key] = (this.options as NonNullable<T>)[key];
+        }
+      });
     }
 
     this.contentSecurityStrategy.applyCSP(element);
@@ -31,7 +37,7 @@ export abstract class ContentStrategy<T extends HTMLScriptElement | HTMLStyleEle
 
 export class StyleContentStrategy extends ContentStrategy<HTMLStyleElement> {
   createElement(): HTMLStyleElement {
-    const element = document.createElement('style');
+    const element = inject(DOCUMENT).createElement('style');
     element.textContent = this.content;
 
     return element;
@@ -40,7 +46,7 @@ export class StyleContentStrategy extends ContentStrategy<HTMLStyleElement> {
 
 export class ScriptContentStrategy extends ContentStrategy<HTMLScriptElement> {
   createElement(): HTMLScriptElement {
-    const element = document.createElement('script');
+    const element = inject(DOCUMENT).createElement('script');
     element.textContent = this.content;
 
     return element;

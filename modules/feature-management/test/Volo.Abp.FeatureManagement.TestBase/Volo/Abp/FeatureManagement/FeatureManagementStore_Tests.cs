@@ -1,68 +1,162 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
+using Volo.Abp.Domain.Entities.Events;
+using Volo.Abp.EventBus.Local;
 using Volo.Abp.Features;
 using Volo.Abp.Modularity;
 using Volo.Abp.Uow;
 using Xunit;
 
-namespace Volo.Abp.FeatureManagement
+namespace Volo.Abp.FeatureManagement;
+
+public abstract class FeatureManagementStore_Tests<TStartupModule> : FeatureManagementTestBase<TStartupModule>
+    where TStartupModule : IAbpModule
 {
-    public abstract class FeatureManagementStore_Tests<TStartupModule> : FeatureManagementTestBase<TStartupModule>
-        where TStartupModule : IAbpModule
+    private IFeatureManagementStore FeatureManagementStore { get; set; }
+    private IFeatureValueRepository FeatureValueRepository { get; set; }
+    private IUnitOfWorkManager UnitOfWorkManager { get; set; }
+    private ILocalEventBus LocalEventBus { get; set; }
+
+    protected FeatureManagementStore_Tests()
     {
-        private IFeatureManagementStore FeatureManagementStore { get; set; }
-        private IFeatureValueRepository FeatureValueRepository { get; set; }
-        private IUnitOfWorkManager UnitOfWorkManager { get; set; }
+        FeatureManagementStore = GetRequiredService<IFeatureManagementStore>();
+        FeatureValueRepository = GetRequiredService<IFeatureValueRepository>();
+        UnitOfWorkManager = GetRequiredService<IUnitOfWorkManager>();
+        LocalEventBus = GetRequiredService<ILocalEventBus>();
+    }
 
-        protected FeatureManagementStore_Tests()
-        {
-            FeatureManagementStore = GetRequiredService<IFeatureManagementStore>();
-            FeatureValueRepository = GetRequiredService<IFeatureValueRepository>();
-            UnitOfWorkManager = GetRequiredService<IUnitOfWorkManager>();
-        }
+    [Fact]
+    public async Task GetOrNullAsync()
+    {
+        // Act
+        (await FeatureManagementStore.GetOrNullAsync(Guid.NewGuid().ToString(),
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldBeNull();
 
-        [Fact]
-        public async Task GetOrNullAsync()
+        (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task Should_Get_Null_Where_Feature_Deleted()
+    {
+        // Arrange
+        (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldNotBeNull();
+
+        // Act
+        await FeatureManagementStore.DeleteAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString());
+
+        // Assert
+        (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SetAsync()
+    {
+        // Arrange
+        (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).Value.ShouldBe(true.ToString().ToLowerInvariant());
+
+        // Act
+        await FeatureManagementStore.SetAsync(TestFeatureDefinitionProvider.SocialLogins,
+            false.ToString().ToUpperInvariant(),
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString());
+
+        // Assert
+        (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).Value.ShouldBe(false.ToString().ToUpperInvariant());
+    }
+
+    [Fact]
+    public async Task Set_Should_Not_Update_The_Entity_When_The_Value_Is_Not_Changed()
+    {
+        // Arrange
+        var currentValue = (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).Value;
+
+        var updatedEventCount = 0;
+        using (LocalEventBus.Subscribe<EntityUpdatedEventData<FeatureValue>>(_ =>
+               {
+                   updatedEventCount++;
+                   return Task.CompletedTask;
+               }))
         {
             // Act
-            (await FeatureManagementStore.GetOrNullAsync(Guid.NewGuid().ToString(),
-                EditionFeatureValueProvider.ProviderName,
-                TestEditionIds.Regular.ToString())).ShouldBeNull();
-
-            (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
-                EditionFeatureValueProvider.ProviderName,
-                TestEditionIds.Regular.ToString())).ShouldNotBeNull();
-        }
-
-        [Fact]
-        public async Task Should_Get_Null_Where_Feature_Deleted()
-        {
-            // Arrange
-            (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
-                EditionFeatureValueProvider.ProviderName,
-                TestEditionIds.Regular.ToString())).ShouldNotBeNull();
-
-            // Act
-            await FeatureManagementStore.DeleteAsync(TestFeatureDefinitionProvider.SocialLogins,
+            await FeatureManagementStore.SetAsync(TestFeatureDefinitionProvider.SocialLogins,
+                currentValue,
                 EditionFeatureValueProvider.ProviderName,
                 TestEditionIds.Regular.ToString());
-
-            // Assert
-            (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
-                EditionFeatureValueProvider.ProviderName,
-                TestEditionIds.Regular.ToString())).ShouldBeNull();
         }
 
-        [Fact]
-        public async Task SetAsync()
+        // Assert
+        updatedEventCount.ShouldBe(0);
+
+        (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).Value.ShouldBe(currentValue);
+
+        (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldBe(currentValue);
+    }
+
+    [Fact]
+    public async Task Set_Should_Update_The_Entity_When_The_Value_Is_Changed()
+    {
+        // Arrange
+        var newValue = false.ToString().ToUpperInvariant();
+        (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).Value.ShouldNotBe(newValue);
+
+        var updatedEventCount = 0;
+        using (LocalEventBus.Subscribe<EntityUpdatedEventData<FeatureValue>>(_ =>
+               {
+                   updatedEventCount++;
+                   return Task.CompletedTask;
+               }))
+        {
+            // Act
+            await FeatureManagementStore.SetAsync(TestFeatureDefinitionProvider.SocialLogins,
+                newValue,
+                EditionFeatureValueProvider.ProviderName,
+                TestEditionIds.Regular.ToString());
+        }
+
+        // Assert
+        updatedEventCount.ShouldBe(1);
+
+        (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).Value.ShouldBe(newValue);
+
+        (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldBe(newValue);
+    }
+
+    [Fact]
+    public async Task Set_In_UnitOfWork_Should_Be_Consistent()
+    {
+        using (UnitOfWorkManager.Begin())
         {
             // Arrange
-            (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
                 EditionFeatureValueProvider.ProviderName,
-                TestEditionIds.Regular.ToString())).Value.ShouldBe(true.ToString().ToLowerInvariant());
+                TestEditionIds.Regular.ToString())).ShouldNotBeNull();
+
 
             // Act
             await FeatureManagementStore.SetAsync(TestFeatureDefinitionProvider.SocialLogins,
@@ -71,40 +165,41 @@ namespace Volo.Abp.FeatureManagement
                 TestEditionIds.Regular.ToString());
 
             // Assert
-            (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
                 EditionFeatureValueProvider.ProviderName,
-                TestEditionIds.Regular.ToString())).Value.ShouldBe(false.ToString().ToUpperInvariant());
+                TestEditionIds.Regular.ToString())).ShouldBe(false.ToString().ToUpperInvariant());
         }
+    }
 
-        [Fact]
-        public async Task Set_In_UnitOfWork_Should_Be_Consistent()
-        {
-            using (UnitOfWorkManager.Begin())
-            {
-                // Arrange
-                (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
-                    EditionFeatureValueProvider.ProviderName,
-                    TestEditionIds.Regular.ToString())).ShouldNotBeNull();
+    [Fact]
+    public async Task DeleteAsync()
+    {
+        // Arrange
+        (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldNotBeNull();
+
+        // Act
+        await FeatureManagementStore.DeleteAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString());
 
 
-                // Act
-                await FeatureManagementStore.SetAsync(TestFeatureDefinitionProvider.SocialLogins,
-                    false.ToString().ToUpperInvariant(),
-                    EditionFeatureValueProvider.ProviderName,
-                    TestEditionIds.Regular.ToString());
+        // Assert
+        (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            EditionFeatureValueProvider.ProviderName,
+            TestEditionIds.Regular.ToString())).ShouldBeNull();
 
-                // Assert
-                (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
-                    EditionFeatureValueProvider.ProviderName,
-                    TestEditionIds.Regular.ToString())).ShouldBe(false.ToString().ToUpperInvariant());
-            }
-        }
 
-        [Fact]
-        public async Task DeleteAsync()
+    }
+
+    [Fact]
+    public async Task Delete_In_UnitOfWork_Should_Be_Consistent()
+    {
+        using (var uow = UnitOfWorkManager.Begin())
         {
             // Arrange
-            (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
                 EditionFeatureValueProvider.ProviderName,
                 TestEditionIds.Regular.ToString())).ShouldNotBeNull();
 
@@ -113,37 +208,58 @@ namespace Volo.Abp.FeatureManagement
                 EditionFeatureValueProvider.ProviderName,
                 TestEditionIds.Regular.ToString());
 
-
             // Assert
-            (await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
                 EditionFeatureValueProvider.ProviderName,
                 TestEditionIds.Regular.ToString())).ShouldBeNull();
-
-
         }
+    }
 
-        [Fact]
-        public async Task Delete_In_UnitOfWork_Should_Be_Consistent()
-        {
-            using (var uow = UnitOfWorkManager.Begin())
-            {
-                // Arrange
-                (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
-                    EditionFeatureValueProvider.ProviderName,
-                    TestEditionIds.Regular.ToString())).ShouldNotBeNull();
+    [Fact]
+    public async Task GetOrNullAsync_Should_Not_Fail_When_Duplicate_Host_Values_Exist()
+    {
+        // Arrange
+        await InsertDuplicateHostFeatureValuesAsync(TestFeatureDefinitionProvider.SocialLogins);
 
-                // Act
-                await FeatureManagementStore.DeleteAsync(TestFeatureDefinitionProvider.SocialLogins,
-                    EditionFeatureValueProvider.ProviderName,
-                    TestEditionIds.Regular.ToString());
+        // Act & Assert
+        (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.UserCount,
+            TenantFeatureValueProvider.ProviderName,
+            null)).ShouldBeNull();
 
-                await uow.SaveChangesAsync();
+        (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
+            TenantFeatureValueProvider.ProviderName,
+            null)).ShouldBe((await FeatureValueRepository.FindAsync(TestFeatureDefinitionProvider.SocialLogins,
+            TenantFeatureValueProvider.ProviderName,
+            null)).Value);
+    }
 
-                // Assert
-                (await FeatureManagementStore.GetOrNullAsync(TestFeatureDefinitionProvider.SocialLogins,
-                    EditionFeatureValueProvider.ProviderName,
-                    TestEditionIds.Regular.ToString())).ShouldBeNull();
-            }
-        }
+    [Fact]
+    public async Task SetAsync_Should_Remove_Duplicate_Host_Values()
+    {
+        // Arrange
+        await InsertDuplicateHostFeatureValuesAsync(TestFeatureDefinitionProvider.SocialLogins);
+
+        // Act
+        await FeatureManagementStore.SetAsync(TestFeatureDefinitionProvider.SocialLogins,
+            false.ToString().ToUpperInvariant(),
+            TenantFeatureValueProvider.ProviderName,
+            null);
+
+        // Assert
+        var featureValues = await FeatureValueRepository.FindAllAsync(TestFeatureDefinitionProvider.SocialLogins,
+            TenantFeatureValueProvider.ProviderName,
+            null);
+        featureValues.Count.ShouldBe(1);
+        featureValues[0].Value.ShouldBe(false.ToString().ToUpperInvariant());
+    }
+
+    private async Task InsertDuplicateHostFeatureValuesAsync(string name)
+    {
+        await FeatureValueRepository.InsertAsync(new FeatureValue(Guid.NewGuid(), name,
+            true.ToString().ToLowerInvariant(), TenantFeatureValueProvider.ProviderName, null));
+        await FeatureValueRepository.InsertAsync(new FeatureValue(Guid.NewGuid(), name,
+            false.ToString().ToLowerInvariant(), TenantFeatureValueProvider.ProviderName, null));
+
+        (await FeatureValueRepository.FindAllAsync(name, TenantFeatureValueProvider.ProviderName, null)).Count.ShouldBe(2);
     }
 }

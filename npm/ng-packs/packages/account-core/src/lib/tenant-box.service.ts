@@ -5,29 +5,27 @@ import {
   SessionStateService,
 } from '@abp/ng.core';
 import { ToasterService } from '@abp/ng.theme.shared';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { finalize } from 'rxjs/operators';
 
 @Injectable()
 export class TenantBoxService {
+  private toasterService = inject(ToasterService);
+  private tenantService = inject(AbpTenantService);
+  private sessionState = inject(SessionStateService);
+  private configState = inject(ConfigStateService);
+
   currentTenant$ = this.sessionState.getTenant$();
 
-  name: string;
+  name?: string;
 
-  isModalVisible: boolean;
+  isModalVisible!: boolean;
 
-  modalBusy: boolean;
-
-  constructor(
-    private toasterService: ToasterService,
-    private tenantService: AbpTenantService,
-    private sessionState: SessionStateService,
-    private configState: ConfigStateService,
-  ) {}
+  modalBusy!: boolean;
 
   onSwitch() {
     const tenant = this.sessionState.getTenant();
-    this.name = tenant?.name;
+    this.name = tenant?.name || '';
     this.isModalVisible = true;
   }
 
@@ -40,7 +38,7 @@ export class TenantBoxService {
 
     this.modalBusy = true;
     this.tenantService
-      .findTenantByName(this.name, {})
+      .findTenantByName(this.name)
       .pipe(finalize(() => (this.modalBusy = false)))
       .subscribe(({ success, tenantId: id, ...tenant }) => {
         if (!success) {
@@ -53,14 +51,14 @@ export class TenantBoxService {
       });
   }
 
-  private setTenant(tenant: CurrentTenantDto) {
+  private setTenant(tenant: CurrentTenantDto | null) {
     this.sessionState.setTenant(tenant);
     this.configState.refreshAppState();
   }
 
   private showError() {
     this.toasterService.error('AbpUiMultiTenancy::GivenTenantIsNotAvailable', 'AbpUi::Error', {
-      messageLocalizationParams: [this.name],
+      messageLocalizationParams: [this.name || ''],
     });
   }
 }

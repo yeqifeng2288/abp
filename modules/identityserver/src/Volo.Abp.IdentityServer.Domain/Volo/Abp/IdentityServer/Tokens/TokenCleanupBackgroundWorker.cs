@@ -1,33 +1,50 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Volo.Abp.BackgroundWorkers;
+using Volo.Abp.DistributedLocking;
 using Volo.Abp.Threading;
 
-namespace Volo.Abp.IdentityServer.Tokens
+namespace Volo.Abp.IdentityServer.Tokens;
+
+public class TokenCleanupBackgroundWorker : AsyncPeriodicBackgroundWorkerBase
 {
-    public class TokenCleanupBackgroundWorker : AsyncPeriodicBackgroundWorkerBase
+    protected TokenCleanupOptions Options { get; }
+    protected IAbpDistributedLock DistributedLock { get; }
+
+    public TokenCleanupBackgroundWorker(
+        AbpAsyncTimer timer,
+        IServiceScopeFactory serviceScopeFactory,
+        IOptions<TokenCleanupOptions> options,
+        IAbpDistributedLock distributedLock)
+        : base(
+            timer,
+            serviceScopeFactory)
     {
-        protected TokenCleanupOptions Options { get; }
+        DistributedLock = distributedLock;
+        Options = options.Value;
+        timer.Period = Options.CleanupPeriod;
+    }
 
-        public TokenCleanupBackgroundWorker(
-            AbpAsyncTimer timer,
-            IServiceScopeFactory serviceScopeFactory,
-            IOptions<TokenCleanupOptions> options)
-            : base(
-                timer,
-                serviceScopeFactory)
+    protected async override Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
+    {
+        await using (var handle = await DistributedLock.TryAcquireAsync(nameof(TokenCleanupBackgroundWorker)))
         {
-            Options = options.Value;
-            timer.Period = Options.CleanupPeriod;
-        }
+            Logger.LogInformation($"Lock is acquired for {nameof(TokenCleanupBackgroundWorker)}");
 
-        protected async override Task DoWorkAsync(PeriodicBackgroundWorkerContext workerContext)
-        {
-            await workerContext
-                .ServiceProvider
-                .GetRequiredService<TokenCleanupService>()
-                .CleanAsync();
+            if (handle != null)
+            {
+                await workerContext
+                    .ServiceProvider
+                    .GetRequiredService<TokenCleanupService>()
+                    .CleanAsync();
+
+                Logger.LogInformation($"Lock is released for {nameof(TokenCleanupBackgroundWorker)}");
+                return;
+            }
+
+            Logger.LogInformation($"Handle is null because of the locking for : {nameof(TokenCleanupBackgroundWorker)}");
         }
     }
 }

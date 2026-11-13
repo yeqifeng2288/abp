@@ -1,61 +1,69 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using System;
 using Microsoft.Extensions.Localization;
-using System;
 using System.Collections.Generic;
 using Volo.Abp.Data;
-using Volo.Abp.Localization;
-using Volo.Abp.ObjectExtending;
 
-namespace Volo.Abp.BlazoriseUI.Components.ObjectExtending
+namespace Volo.Abp.BlazoriseUI.Components.ObjectExtending;
+
+public partial class SelectExtensionProperty<TEntity, TResourceType>
+    where TEntity : IHasExtraProperties
 {
-    public partial class SelectExtensionProperty<TEntity, TResourceType> : ComponentBase
-        where TEntity : IHasExtraProperties
+    protected List<SelectItem<int?>> SelectItems = new();
+
+    public int? SelectedValue {
+        get
+        {
+            return Entity.GetProperty<int?>(PropertyInfo.Name, Nullable.GetUnderlyingType(PropertyInfo.Type!) != null ? null : 0);
+        }
+        set { Entity.SetProperty(PropertyInfo.Name, value, false); }
+    }
+
+    protected virtual List<SelectItem<int?>> GetSelectItemsFromEnum()
     {
-        protected List<SelectItem<int>> SelectItems = new ();
-        
-        [Inject] public IStringLocalizerFactory StringLocalizerFactory { get; set; }
+        var selectItems = new List<SelectItem<int?>>();
 
-        [Parameter] public TEntity Entity { get; set; }
+        var isNullableType = Nullable.GetUnderlyingType(PropertyInfo.Type!) != null;
+        var enumType = isNullableType
+            ? Nullable.GetUnderlyingType(PropertyInfo.Type)!
+            : PropertyInfo.Type;
 
-        [Parameter] public ObjectExtensionPropertyInfo PropertyInfo { get; set; }
-
-        public int SelectedValue
+        if (isNullableType)
         {
-            get { return Entity.GetProperty<int>(PropertyInfo.Name); }
-            set { Entity.SetProperty(PropertyInfo.Name, value, false); }
+            selectItems.Add(new SelectItem<int?>());
         }
-        
-        protected virtual List<SelectItem<int>> GetSelectItemsFromEnum()
+        foreach (var enumValue in enumType.GetEnumValues())
         {
-            var selectItems = new List<SelectItem<int>>();
-            
-            foreach (var enumValue in PropertyInfo.Type.GetEnumValues())
+            selectItems.Add(new SelectItem<int?>
             {
-                selectItems.Add( new SelectItem<int>
-                {
-                    Value = (int) enumValue,
-                    Text = EnumHelper.GetLocalizedMemberName(PropertyInfo.Type, enumValue, StringLocalizerFactory)
-                });
-            }
-
-            return selectItems;
+                Value = (int)enumValue,
+                Text = AbpEnumLocalizer.GetString(enumType, enumValue, new []{ StringLocalizerFactory.CreateDefaultOrNull() })
+            });
         }
 
-        protected override void OnParametersSet()
-        {
-            SelectItems = GetSelectItemsFromEnum();
-            StateHasChanged();
+        return selectItems;
+    }
 
-            if (!Entity.HasProperty(PropertyInfo.Name))
+    protected override void OnParametersSet()
+    {
+        SelectItems = GetSelectItemsFromEnum();
+        StateHasChanged();
+
+        if (!Entity.HasProperty(PropertyInfo.Name))
+        {
+            var isNullableType = Nullable.GetUnderlyingType(PropertyInfo.Type!) != null;
+            if (!isNullableType)
             {
-                SelectedValue = (int)PropertyInfo.Type.GetEnumValues().GetValue(0);
+                var enumType = isNullableType
+                    ? Nullable.GetUnderlyingType(PropertyInfo.Type)!
+                    : PropertyInfo.Type;
+                SelectedValue = (int)enumType.GetEnumValues().GetValue(0)!;
             }
         }
     }
+}
 
-    public class SelectItem<TValue>
-    {
-        public string Text { get; set; }
-        public TValue Value { get; set; }
-    }
+public class SelectItem<TValue>
+{
+    public string Text { get; set; } = default!;
+    public TValue Value { get; set; } = default!;
 }

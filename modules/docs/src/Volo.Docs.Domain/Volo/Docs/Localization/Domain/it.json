@@ -29,13 +29,18 @@
     "FullSearch": "Cerca nei documenti",
     "Volo.Docs.Domain:010001": "La ricerca elastica non è abilitata.",
     "MultipleVersionDocumentInfo": "Questo documento ha più versioni. Seleziona le opzioni più adatte a te.",
+    "DocumentOptions": "Opzioni del documento",
     "New": "Nuovo",
     "Upd": "Agg",
     "NewExplanation": "Creato nelle ultime due settimane.",
     "UpdatedExplanation": "Aggiornato nelle ultime due settimane.",
     "Volo.Docs.Domain:010002": "Abbreviazione {ShortName} esiste già.",
+    "Volo.Docs.Domain:010003": "Ops, il documento richiesto non è stato trovato!",
     "Preview": "anteprima",
     "Search": "Ricerca",
-    "SearchResults": "Risultati della ricerca"
+    "SearchResults": "Risultati della ricerca",
+    "SearchInTheAllDocuments": "Cerca in tutti i documenti",
+    "GoogleTranslate": "Traduci con Google",
+    "DownloadPDF": "Scarica PDF"
   }
 }

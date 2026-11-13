@@ -1,77 +1,91 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
-using JetBrains.Annotations;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.JSInterop;
+using Volo.Abp.AspNetCore.Components.Web;
+using Volo.Abp.AspNetCore.Components.Web.Security;
+using Volo.Abp.AspNetCore.Components.WebAssembly;
+using Volo.Abp.Localization;
 using Volo.Abp.UI.Navigation;
 
-namespace Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme.Themes.Basic
+namespace Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme.Themes.Basic;
+
+public partial class LoginDisplay : IDisposable
 {
-    public partial class LoginDisplay : IDisposable
+    [Inject]
+    protected IMenuManager MenuManager { get; set; }
+
+    [Inject]
+    protected ApplicationConfigurationChangedService ApplicationConfigurationChangedService { get; set; }
+
+    [Inject]
+    protected IRouteBasedCultureUrlHelper CultureUrlHelper { get; set; }
+
+    protected ApplicationMenu Menu { get; set; }
+
+    // Blazorise's dropdown-menu-end sets right: 0, which wins over the computed left offset in an RTL layout
+    protected static string MenuStyle => CultureHelper.IsRtl ? "right: auto" : null;
+
+    protected string LoginUrl { get; set; } = string.Empty;
+
+    protected string LogoutUrl { get; set; } = string.Empty;
+
+    protected async override Task OnInitializedAsync()
     {
-        [Inject]
-        protected IMenuManager MenuManager { get; set; }
+        LoginUrl = await CultureUrlHelper.PrependCulturePrefixAsync(AuthenticationOptions.Value.LoginUrl);
+        LogoutUrl = await CultureUrlHelper.PrependCulturePrefixAsync(AuthenticationOptions.Value.LogoutUrl);
 
-        [Inject]
-        public AuthenticationStateProvider AuthenticationStateProvider { get; set; }
+        Menu = await MenuManager.GetAsync(StandardMenus.User);
 
-        [CanBeNull]
-        protected SignOutSessionStateManager SignOutManager;
+        Navigation.LocationChanged += OnLocationChanged;
 
-        protected ApplicationMenu Menu { get; set; }
+        ApplicationConfigurationChangedService.Changed += ApplicationConfigurationChanged;
+    }
 
-        protected override async Task OnInitializedAsync()
+    protected virtual void OnLocationChanged(object sender, LocationChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void ApplicationConfigurationChanged()
+    {
+        LoginUrl = await CultureUrlHelper.PrependCulturePrefixAsync(AuthenticationOptions.Value.LoginUrl);
+        LogoutUrl = await CultureUrlHelper.PrependCulturePrefixAsync(AuthenticationOptions.Value.LogoutUrl);
+        Menu = await MenuManager.GetAsync(StandardMenus.User);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        ApplicationConfigurationChangedService.Changed -= ApplicationConfigurationChanged;
+    }
+
+    private async Task NavigateToAsync(string uri, string target = null)
+    {
+        uri = MenuItemUrlHelper.ToBaseRelativeUrl(uri);
+
+        if (target == "_blank")
         {
-            Menu = await MenuManager.GetAsync(StandardMenus.User);
-
-            Navigation.LocationChanged += OnLocationChanged;
-
-            LazyGetService(ref SignOutManager);
-
-            AuthenticationStateProvider.AuthenticationStateChanged +=
-                AuthenticationStateProviderOnAuthenticationStateChanged;
+            await JsRuntime.InvokeVoidAsync("open", Navigation.ToAbsoluteUri(uri).ToString(), target);
         }
-
-        protected virtual void OnLocationChanged(object sender, LocationChangedEventArgs e)
+        else
         {
-            InvokeAsync(StateHasChanged);
+            Navigation.NavigateTo(uri);
         }
+    }
 
-        private async void AuthenticationStateProviderOnAuthenticationStateChanged(Task<AuthenticationState> task)
+    private async Task BeginSignOut()
+    {
+        if (AbpAspNetCoreComponentsWebOptions.Value.IsBlazorWebApp)
         {
-            Menu = await MenuManager.GetAsync(StandardMenus.User);
-            await InvokeAsync(StateHasChanged);
+            Navigation.NavigateTo(LogoutUrl, forceLoad: true);
         }
-
-        public void Dispose()
+        else
         {
-            Navigation.LocationChanged -= OnLocationChanged;
-            AuthenticationStateProvider.AuthenticationStateChanged -=
-                AuthenticationStateProviderOnAuthenticationStateChanged;
-        }
-
-        private async Task NavigateToAsync(string uri, string target = null)
-        {
-            if (target == "_blank")
-            {
-                await JsRuntime.InvokeVoidAsync("open", uri, target);
-            }
-            else
-            {
-                Navigation.NavigateTo(uri);
-            }
-        }
-
-        private async Task BeginSignOut()
-        {
-            if (SignOutManager != null)
-            {
-                await SignOutManager.SetSignOutState();
-                await NavigateToAsync("authentication/logout");
-            }
+            Navigation.NavigateToLogout(LogoutUrl);
         }
     }
 }

@@ -1,3 +1,5 @@
+import { eServiceType } from '../enums';
+
 export interface GenerateProxySchema {
   /**
    * Backend module name
@@ -18,4 +20,20 @@ export interface GenerateProxySchema {
    * Target Angular project to place the generated code
    */
   target?: string;
+
+  /**
+   * Url to API definition
+   */
+  url?: string;
+
+  /**
+   * Secondary entrypoint for proxy generation
+   */
+  entryPoint?: string;
+  serviceType?: eServiceType;
+
+  /**
+   * Generate Resource API helpers for read operations.
+   */
+  resourceApi?: boolean;
 }

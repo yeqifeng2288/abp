@@ -1,27 +1,22 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using Microsoft.Extensions.DependencyInjection;
-using NSubstitute;
-using Volo.Abp.Users;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Volo.Abp.Authorization.Permissions;
 
-namespace Volo.Abp.PermissionManagement
+namespace Volo.Abp.PermissionManagement;
+
+public class AbpPermissionManagementApplicationTestBase : PermissionManagementTestBase<AbpPermissionManagementApplicationTestModule>
 {
-    public class AbpPermissionManagementApplicationTestBase : PermissionManagementTestBase<AbpPermissionManagementApplicationTestModule>
+    protected Guid? CurrentUserId { get; set; }
+
+    protected AbpPermissionManagementApplicationTestBase()
     {
-        protected Guid? CurrentUserId { get; set; }
-
-        protected AbpPermissionManagementApplicationTestBase()
-        {
-            CurrentUserId = Guid.NewGuid();
-        }
-        protected override void AfterAddApplication(IServiceCollection services)
-        {
-            var currentUser = Substitute.For<ICurrentUser>();
-            currentUser.Roles.Returns(new []{ "admin" });
-            currentUser.IsAuthenticated.Returns(true);
-
-            services.AddSingleton(currentUser);
-        }
+        CurrentUserId = Guid.NewGuid();
+    }
+    protected override void AfterAddApplication(IServiceCollection services)
+    {
+        var fakePermissionChecker = new FakePermissionChecker();
+        services.AddSingleton(fakePermissionChecker);
+        services.Replace(ServiceDescriptor.Singleton<IPermissionChecker>(fakePermissionChecker));
     }
 }

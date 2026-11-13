@@ -1,6 +1,7 @@
 {
   "culture": "hi",
   "texts": {
+    "Menu:Account": "लेखा",
     "UserName": "उपयोगकर्ता नाम",
     "EmailAddress": "ईमेल पता",
     "UserNameOrEmailAddress": "उपयोगकर्ता का नाम या ईमेल पता",
@@ -10,6 +11,8 @@
     "UserLockedOutMessage": "अमान्य लॉगिन प्रयासों के कारण उपयोगकर्ता खाता बंद कर दिया गया है। कृपया थोड़ी देर प्रतीक्षा करें और पुन: प्रयास करें।",
     "InvalidUserNameOrPassword": "अमान्य उपयोगकर्ता नाम या पासवर्ड!",
     "LoginIsNotAllowed": "आपको लॉगिन करने की अनुमति नहीं है! आपका खाता निष्क्रिय है या आपके ईमेल/फ़ोन नंबर की पुष्टि करने की आवश्यकता है।",
+    "ExternalLoginPasswordChangeRequired": "आपको लॉगिन करने की अनुमति नहीं है! आपका पासवर्ड बदला जाना आवश्यक है, लेकिन बाहरी लॉगिन के साथ यह संभव नहीं है। कृपया अपने व्यवस्थापक से संपर्क करें।",
+    "RegisteredButLoginIsNotAllowed": "आपका खाता बना दिया गया है, लेकिन आपको अभी लॉगिन करने की अनुमति नहीं है!",
     "SelfRegistrationDisabledMessage": "इस आवेदन के लिए स्व-पंजीकरण अक्षम है। नया उपयोगकर्ता पंजीकृत करने के लिए कृपया एप्लिकेशन व्यवस्थापक से संपर्क करें।",
     "LocalLoginDisabledMessage": "इस एप्लिकेशन के लिए स्थानीय लॉगिन अक्षम है।",
     "Login": "लॉग इन करें",
@@ -33,8 +36,11 @@
     "DisplayName:PhoneNumber": "फ़ोन नंबर",
     "PersonalSettings": "व्यक्तिगत सेटिंग",
     "PersonalSettingsSaved": "व्यक्तिगत सेटिंग्स सहेजे गए",
+    "PersonalSettingsChangedConfirmationModalTitle": "व्यक्तिगत जानकारी बदल दी गई",
+    "PersonalSettingsChangedConfirmationModalDescription": "अगर आप इन बदलावों को लागू करना चाहते हैं तो आपको लॉगइन करना होगा। क्या आप लॉग आउट करना चाहते हैं?",
     "PasswordChanged": "पासवर्ड बदला गया",
     "NewPasswordConfirmFailed": "कृपया नए पासवर्ड की पुष्टि करें।",
+    "NewPasswordSameAsOld": "नया पासवर्ड वर्तमान पासवर्ड से एक ही होना चाहिए।",
     "Manage": "प्रबंधित",
     "MyAccount": "मेरा खाता",
     "DisplayName:Abp.Account.IsSelfRegistrationEnabled": "क्या स्व-पंजीकरण सक्षम है",
@@ -49,7 +55,7 @@
     "SendPasswordResetLink_Information": "पासवर्ड रीसेट करने के लिए आपके ईमेल पर एक पासवर्ड रीसेट लिंक भेजा जाएगा। यदि आपको कुछ मिनटों के भीतर ईमेल नहीं मिलता है, तो कृपया पुनः प्रयास करें।",
     "PasswordResetMailSentMessage": "खाता पुनर्प्राप्ति ईमेल आपके ई-मेल पते पर भेजी जाती है। यदि आप 15 मिनट के भीतर अपने इनबॉक्स में यह ईमेल नहीं देखते हैं, तो इसे अपने जंक मेल फ़ोल्डर में देखें। यदि आप इसे वहां पाते हैं, तो कृपया इसे चिह्नित करें -नहीं जोड़-।",
     "ResetPassword": "पासवर्ड रीसेट",
-    "ConfirmPassword": "पासवर्ड की पुष्टि करें (दोहराएं)",
+    "ConfirmPassword": "पासवर्ड की पुष्टि करें",
     "ResetPassword_Information": "कृपया अपना नया पासवर्ड दर्ज करें।",
     "YourPasswordIsSuccessfullyReset": "आपका पासवर्ड सफलतापूर्वक रीसेट हो गया है।",
     "GoToTheApplication": "एप्लिकेशन पर जाएं",
@@ -62,6 +68,10 @@
     "PasswordResetInfoInEmail": "हमें एक खाता पुनर्प्राप्ति अनुरोध प्राप्त हुआ! यदि आपने यह अनुरोध किया है, तो अपना पासवर्ड रीसेट करने के लिए निम्न लिंक पर क्लिक करें।",
     "ResetMyPassword": "अपना पासवर्ड रीसेट करें",
     "AccessDenied": "पहुंच अस्वीकृत!",
-    "AccessDeniedMessage": "आपके पास इस संसाधन तक पहुँच नहीं है।"
+    "AccessDeniedMessage": "आपके पास इस संसाधन तक पहुँच नहीं है।",
+    "OrRegisterWith": "या इसके साथ पंजीकरण करें:",
+    "RegisterUsingYourProviderAccount": "अपने {0} खाते का उपयोग करके पंजीकरण करें",
+    "RequireMigrateSeedTitle": "व्यवस्थापक उपयोगकर्ता नहीं मिला",
+    "RequireMigrateSeedMessage": "कृपया सुनिश्चित करें कि डेटाबेस सीड निष्पादित किया गया है। संभावित समाधानों के लिए <a target=\"_blank\" href=\"https://abp.io/kb/0003\">दस्तावेज़ीकरण</a> देखें।"
   }
 }

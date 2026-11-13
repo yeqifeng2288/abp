@@ -1,10 +1,10 @@
 ﻿using System;
+using System.Threading.Tasks;
 using RabbitMQ.Client;
 
-namespace Volo.Abp.RabbitMQ
+namespace Volo.Abp.RabbitMQ;
+
+public interface IConnectionPool : IAsyncDisposable
 {
-    public interface IConnectionPool : IDisposable
-    {
-        IConnection Get(string connectionName = null);
-    }
+    Task<IConnection> GetAsync(string? connectionName = null);
 }

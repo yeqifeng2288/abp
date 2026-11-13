@@ -29,13 +29,18 @@
     "FullSearch": "Išči v dokumentih",
     "Volo.Docs.Domain:010001": "Elastično iskanje ni omogočeno.",
     "MultipleVersionDocumentInfo": "Ta dokument ima več verzij. Izberite možnosti, ki so najprimernejše.",
+    "DocumentOptions": "Možnosti dokumenta",
     "New": "Nov",
     "Upd": "Posod.",
     "NewExplanation": "Ustvarjeno v zadnjih dveh tednih.",
     "UpdatedExplanation": "Posodobljeno v zadnjih dveh tednih.",
     "Volo.Docs.Domain:010002": "ShortName {ShortName} že obstaja.",
+    "Volo.Docs.Domain:010003": "Ups, zahtevanega dokumenta ni bilo mogoče najti!",
     "Preview": "predogled",
     "Search": "Iskanje",
-    "SearchResults": "Rezultati iskanja"
+    "SearchResults": "Rezultati iskanja",
+    "SearchInTheAllDocuments": "Poiščite v vseh dokumentih",
+    "GoogleTranslate": "Google prevajalnik",
+    "DownloadPDF": "Prenesi PDF"
   }
 }

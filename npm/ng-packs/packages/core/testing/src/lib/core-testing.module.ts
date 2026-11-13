@@ -7,14 +7,19 @@ import {
   LOADER_DELAY,
   PermissionService,
   RestService,
+  INCUDE_LOCALIZATION_RESOURCES_TOKEN,
+  OTHERS_GROUP,
+  compareFuncFactory,
+  SORT_COMPARE_FUNC,
 } from '@abp/ng.core';
 import { APP_BASE_HREF } from '@angular/common';
 import { ModuleWithProviders, NgModule } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { provideRoutes } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { MockPermissionService } from './services/mock-permission.service';
 import { MockRestService } from './services/mock-rest.service';
+import { LocalizationPipe } from './pipes';
 
 /**
  * CoreTestingModule is the module that will be used in tests
@@ -22,7 +27,7 @@ import { MockRestService } from './services/mock-rest.service';
  */
 @NgModule({
   exports: [RouterTestingModule, BaseCoreModule],
-  imports: [NoopAnimationsModule, RouterTestingModule, BaseCoreModule],
+  imports: [NoopAnimationsModule, RouterTestingModule, BaseCoreModule, LocalizationPipe],
 })
 export class CoreTestingModule {
   static withConfig(
@@ -60,7 +65,19 @@ export class CoreTestingModule {
           provide: LOADER_DELAY,
           useValue: 0,
         },
-        provideRoutes(routes),
+        {
+          provide: INCUDE_LOCALIZATION_RESOURCES_TOKEN,
+          useValue: false,
+        },
+        {
+          provide: OTHERS_GROUP,
+          useValue: 'AbpUi::OthersGroup',
+        },
+        {
+          provide: SORT_COMPARE_FUNC,
+          useFactory: compareFuncFactory,
+        },
+        provideRouter(routes),
       ],
     };
   }

@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Volo.Abp.AutoMapper;
+using Volo.Abp.Mapperly;
 using Volo.Abp.Caching;
 using Volo.Abp.Data;
 using Volo.Abp.Domain;
@@ -10,43 +10,37 @@ using Volo.Abp.ObjectExtending;
 using Volo.Abp.ObjectExtending.Modularity;
 using Volo.Abp.Threading;
 
-namespace Volo.Abp.TenantManagement
+namespace Volo.Abp.TenantManagement;
+
+[DependsOn(typeof(AbpMultiTenancyModule))]
+[DependsOn(typeof(AbpTenantManagementDomainSharedModule))]
+[DependsOn(typeof(AbpDataModule))]
+[DependsOn(typeof(AbpDddDomainModule))]
+[DependsOn(typeof(AbpMapperlyModule))]
+[DependsOn(typeof(AbpCachingModule))]
+public class AbpTenantManagementDomainModule : AbpModule
 {
-    [DependsOn(typeof(AbpMultiTenancyModule))]
-    [DependsOn(typeof(AbpTenantManagementDomainSharedModule))]
-    [DependsOn(typeof(AbpDataModule))]
-    [DependsOn(typeof(AbpDddDomainModule))]
-    [DependsOn(typeof(AbpAutoMapperModule))]
-    [DependsOn(typeof(AbpCachingModule))]
-    public class AbpTenantManagementDomainModule : AbpModule
+    private static readonly OneTimeRunner OneTimeRunner = new OneTimeRunner();
+
+    public override void ConfigureServices(ServiceConfigurationContext context)
     {
-        private static readonly OneTimeRunner OneTimeRunner = new OneTimeRunner();
+        context.Services.AddMapperlyObjectMapper<AbpTenantManagementDomainModule>();
 
-        public override void ConfigureServices(ServiceConfigurationContext context)
+        Configure<AbpDistributedEntityEventOptions>(options =>
         {
-            context.Services.AddAutoMapperObjectMapper<AbpTenantManagementDomainModule>();
+            options.EtoMappings.Add<Tenant, TenantEto>(typeof(AbpTenantManagementDomainModule));
+        });
+    }
 
-            Configure<AbpAutoMapperOptions>(options =>
-            {
-                options.AddProfile<AbpTenantManagementDomainMappingProfile>(validate: true);
-            });
-
-            Configure<AbpDistributedEntityEventOptions>(options =>
-            {
-                options.EtoMappings.Add<Tenant, TenantEto>();
-            });
-        }
-
-        public override void PostConfigureServices(ServiceConfigurationContext context)
+    public override void PostConfigureServices(ServiceConfigurationContext context)
+    {
+        OneTimeRunner.Run(() =>
         {
-            OneTimeRunner.Run(() =>
-            {
-                ModuleExtensionConfigurationHelper.ApplyEntityConfigurationToEntity(
-                    TenantManagementModuleExtensionConsts.ModuleName,
-                    TenantManagementModuleExtensionConsts.EntityNames.Tenant,
-                    typeof(Tenant)
-                );
-            });
-        }
+            ModuleExtensionConfigurationHelper.ApplyEntityConfigurationToEntity(
+                TenantManagementModuleExtensionConsts.ModuleName,
+                TenantManagementModuleExtensionConsts.EntityNames.Tenant,
+                typeof(Tenant)
+            );
+        });
     }
 }

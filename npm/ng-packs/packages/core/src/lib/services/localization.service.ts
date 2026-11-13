@@ -1,10 +1,13 @@
 import { registerLocaleData } from '@angular/common';
-import { Injectable, Injector, isDevMode, Optional, SkipSelf } from '@angular/core';
+import { Injectable, Injector, isDevMode, inject } from '@angular/core';
 import { BehaviorSubject, combineLatest, from, Observable, Subject } from 'rxjs';
-import { filter, map, mapTo, switchMap } from 'rxjs/operators';
+import { filter, map, switchMap } from 'rxjs/operators';
 import { ABP } from '../models/common';
 import { LocalizationWithDefault } from '../models/localization';
-import { ApplicationConfigurationDto } from '../proxy/volo/abp/asp-net-core/mvc/application-configurations/models';
+import {
+  ApplicationConfigurationDto,
+  ApplicationLocalizationResourceDto,
+} from '../proxy/volo/abp/asp-net-core/mvc/application-configurations/models';
 import { localizations$ } from '../tokens/localization.token';
 import { CORE_OPTIONS } from '../tokens/options.token';
 import { createLocalizer, createLocalizerWithFallback } from '../utils/localization-utils';
@@ -14,6 +17,10 @@ import { SessionStateService } from './session-state.service';
 
 @Injectable({ providedIn: 'root' })
 export class LocalizationService {
+  private sessionState = inject(SessionStateService);
+  private injector = inject(Injector);
+  private configState = inject(ConfigStateService);
+
   private latestLang = this.sessionState.getLanguage();
   private _languageChange$ = new Subject<string>();
 
@@ -25,23 +32,25 @@ export class LocalizationService {
 
   /**
    * Returns currently selected language
+   * Even though this looks like it's redundant to return the same value as `getLanguage()`,
+   * it's actually not. This could be invoked any time, and the latestLang could be different from the
+   * sessionState.getLanguage() value.
    */
   get currentLang(): string {
     return this.latestLang || this.sessionState.getLanguage();
+  }
+
+  get currentLang$(): Observable<string> {
+    return this.sessionState.getLanguage$();
   }
 
   get languageChange$(): Observable<string> {
     return this._languageChange$.asObservable();
   }
 
-  constructor(
-    private sessionState: SessionStateService,
-    private injector: Injector,
-    @Optional()
-    @SkipSelf()
-    otherInstance: LocalizationService,
-    private configState: ConfigStateService,
-  ) {
+  constructor() {
+    const otherInstance = inject(LocalizationService, { optional: true, skipSelf: true })!;
+
     if (otherInstance) throw new Error('LocalizationService should have only one instance.');
 
     this.listenToSetLanguage();
@@ -51,18 +60,29 @@ export class LocalizationService {
   private initLocalizationValues() {
     localizations$.subscribe(val => this.addLocalization(val));
 
-    const remoteLocalizations$ = this.configState.getDeep$('localization.values') as Observable<
+    // Backend-based localization loading (always enabled)
+    // UI localizations are merged via addLocalization() (UI > Backend priority)
+    const legacyResources$ = this.configState.getDeep$('localization.values') as Observable<
       Record<string, Record<string, string>>
     >;
+
+    const remoteLocalizations$ = this.configState.getDeep$('localization.resources') as Observable<
+      Record<string, ApplicationLocalizationResourceDto>
+    >;
+
     const currentLanguage$ = this.sessionState.getLanguage$();
 
     const uiLocalizations$ = combineLatest([currentLanguage$, this.uiLocalizations$]).pipe(
       map(([currentLang, localizations]) => localizations.get(currentLang)),
     );
 
-    combineLatest([remoteLocalizations$, uiLocalizations$])
+    combineLatest([legacyResources$, remoteLocalizations$, uiLocalizations$])
       .pipe(
-        map(([remote, local]) => {
+        map(([legacy, resource, local]) => {
+          if (!resource) {
+            return;
+          }
+          const remote = combineLegacyandNewResources(legacy || {}, resource);
           if (remote) {
             if (!local) {
               local = new Map();
@@ -71,15 +91,17 @@ export class LocalizationService {
             Object.entries(remote).forEach(entry => {
               const resourceName = entry[0];
               const remoteTexts = entry[1];
-              let resource = local.get(resourceName) || {};
-              resource = { ...resource, ...remoteTexts };
+              let resource = local?.get(resourceName) || {};
+              // UI > Backend priority: local texts override remote texts
+              resource = { ...remoteTexts, ...resource };
 
-              local.set(resourceName, resource);
+              local?.set(resourceName, resource);
             });
           }
 
           return local;
         }),
+        filter(Boolean),
       )
       .subscribe(val => this.localizations$.next(val));
   }
@@ -114,7 +136,8 @@ export class LocalizationService {
         filter(
           lang => this.configState.getDeep('localization.currentCulture.cultureName') !== lang,
         ),
-        switchMap(lang => this.configState.refreshAppState().pipe(mapTo(lang))),
+        switchMap(lang => this.configState.refreshLocalization(lang).pipe(map(() => lang))),
+        filter(Boolean),
         switchMap(lang => from(this.registerLocale(lang).then(() => lang))),
       )
       .subscribe(lang => this._languageChange$.next(lang));
@@ -157,14 +180,14 @@ export class LocalizationService {
     return this.getLocalization(this.configState.getAll(), key, ...interpolateParams);
   }
 
-  localize(resourceName: string, key: string, defaultValue: string): Observable<string> {
+  localize(resourceName: string, key: string, defaultValue: string): Observable<string | null> {
     return this.configState.getOne$('localization').pipe(
       map(createLocalizer),
       map(localize => localize(resourceName, key, defaultValue)),
     );
   }
 
-  localizeSync(resourceName: string, key: string, defaultValue: string): string {
+  localizeSync(resourceName: string, key: string, defaultValue: string): string | null {
     const localization = this.configState.getOne('localization');
     return createLocalizer(localization)(resourceName, key, defaultValue);
   }
@@ -190,8 +213,11 @@ export class LocalizationService {
     key: string | LocalizationWithDefault,
     ...interpolateParams: string[]
   ) {
-    if (!key) key = '';
-    let defaultValue: string;
+    let defaultValue = '';
+
+    if (!key) {
+      return defaultValue;
+    }
 
     if (typeof key !== 'string') {
       defaultValue = key.defaultValue;
@@ -200,11 +226,12 @@ export class LocalizationService {
 
     const keys = key.split('::') as string[];
     const warn = (message: string) => {
-      if (isDevMode) console.warn(message);
+      if (isDevMode()) console.warn(message);
     };
 
     if (keys.length < 2) {
-      warn('The localization source separator (::) not found.');
+      // A plain string without the `::` separator is a valid passthrough value
+      // (e.g. text piped through `abpLocalization`), so it must not warn here.
       return defaultValue || (key as string);
     }
     if (!state.localization) return defaultValue || keys[1];
@@ -243,3 +270,44 @@ export class LocalizationService {
     return localization || defaultValue || (key as string);
   }
 }
+
+function recursivelyMergeBaseResources(
+  baseResourceName: string,
+  source: ResourceDto,
+): ApplicationLocalizationResourceDto {
+  const item = source[baseResourceName];
+
+  if (item.baseResources.length === 0) {
+    return item;
+  }
+
+  return item.baseResources.reduce((acc, baseResource) => {
+    const baseItem = recursivelyMergeBaseResources(baseResource, source);
+    const texts = { ...baseItem.texts, ...acc.texts };
+    return { ...acc, texts };
+  }, item);
+}
+
+function mergeResourcesWithBaseResource(resource: ResourceDto): ResourceDto {
+  const entities: Array<[string, ApplicationLocalizationResourceDto]> = Object.keys(resource).map(
+    key => {
+      const newValue = recursivelyMergeBaseResources(key, resource);
+      return [key, newValue];
+    },
+  );
+  return entities.reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+}
+
+function combineLegacyandNewResources(
+  legacy: LegacyLanguageDto,
+  resource: ResourceDto,
+): LegacyLanguageDto {
+  const mergedResource = mergeResourcesWithBaseResource(resource);
+
+  return Object.entries(mergedResource).reduce((acc, [key, value]) => {
+    return { ...acc, [key]: value.texts };
+  }, legacy);
+}
+
+export type LegacyLanguageDto = Record<string, Record<string, string>>;
+export type ResourceDto = Record<string, ApplicationLocalizationResourceDto>;

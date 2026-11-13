@@ -6,46 +6,63 @@ using Volo.Abp.DependencyInjection;
 using Volo.Abp.Guids;
 using Volo.Abp.MultiTenancy;
 
-namespace Volo.Abp.Identity.AspNetCore
+namespace Volo.Abp.Identity.AspNetCore;
+
+public class FakeExternalLoginProvider : ExternalLoginProviderBase, ITransientDependency
 {
-    public class FakeExternalLoginProvider : ExternalLoginProviderBase, ITransientDependency
+    public const string Name = "Fake";
+
+    public FakeExternalLoginProvider(
+        IGuidGenerator guidGenerator,
+        ICurrentTenant currentTenant,
+        IdentityUserManager userManager,
+        IIdentityUserRepository identityUserRepository,
+        IOptions<IdentityOptions> identityOptions)
+        : base(
+            guidGenerator,
+            currentTenant,
+            userManager,
+            identityUserRepository,
+            identityOptions)
     {
-        public const string Name = "Fake";
 
-        public FakeExternalLoginProvider(
-            IGuidGenerator guidGenerator,
-            ICurrentTenant currentTenant,
-            IdentityUserManager userManager,
-            IIdentityUserRepository identityUserRepository,
-            IOptions<IdentityOptions> identityOptions)
-            : base(
-                guidGenerator,
-                currentTenant,
-                userManager,
-                identityUserRepository,
-                identityOptions)
+    }
+
+    public override Task<bool> TryAuthenticateAsync(string userName, string plainPassword)
+    {
+        return Task.FromResult(
+            (userName == "ext_user" || userName == "ext_2fa_user") && plainPassword == "abc"
+        );
+    }
+
+    public override Task<bool> IsEnabledAsync()
+    {
+        return Task.FromResult(true);
+    }
+
+    protected override Task<ExternalLoginUserInfo> GetUserInfoAsync(string userName)
+    {
+        if (userName == "ext_2fa_user")
         {
-
-        }
-
-        public override Task<bool> TryAuthenticateAsync(string userName, string plainPassword)
-        {
+            // TwoFactorEnabled is not set, so the two factor state of the user is left untouched.
             return Task.FromResult(
-                userName == "ext_user" && plainPassword == "abc"
+                new ExternalLoginUserInfo("ext_2fa_user@test.com")
+                {
+                    EmailConfirmed = true,
+                    ProviderKey = "456"
+                }
             );
         }
 
-        protected override Task<ExternalLoginUserInfo> GetUserInfoAsync(string userName)
+        if (userName != "ext_user")
         {
-            if (userName != "ext_user")
-            {
-                throw new ArgumentException();
-            }
+            throw new ArgumentException();
+        }
 
-            return Task.FromResult(
-                new ExternalLoginUserInfo("ext_user@test.com")
-                {
-                    Name = "Test Name", //optional, if the provider knows it
+        return Task.FromResult(
+            new ExternalLoginUserInfo("ext_user@test.com")
+            {
+                Name = "Test Name", //optional, if the provider knows it
                     Surname = "Test Surname", //optional, if the provider knows it
                     EmailConfirmed = true, //optional, if the provider knows it
                     TwoFactorEnabled = false, //optional, if the provider knows it
@@ -53,7 +70,6 @@ namespace Volo.Abp.Identity.AspNetCore
                     PhoneNumberConfirmed = false, //optional, if the provider knows it
                     ProviderKey = "123" //The id of the user on the provider side
                 }
-            );
-        }
+        );
     }
 }

@@ -1,30 +1,28 @@
 ﻿using JetBrains.Annotations;
 using System;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 
-namespace Volo.Abp.EntityFrameworkCore
+namespace Volo.Abp.EntityFrameworkCore;
+
+public static class AbpDbContextOptionsMySQLExtensions
 {
-    public static class AbpDbContextOptionsMySQLExtensions
+    public static void UseMySQL(
+        [NotNull] this AbpDbContextOptions options,
+        Action<MySql.EntityFrameworkCore.Infrastructure.MySQLDbContextOptionsBuilder>? mySQLOptionsAction = null)
     {
-        public static void UseMySQL(
-                [NotNull] this AbpDbContextOptions options,
-                [CanBeNull] Action<MySqlDbContextOptionsBuilder> mySQLOptionsAction = null)
+        options.Configure(context =>
         {
-            options.Configure(context =>
-            {
-                context.UseMySQL(mySQLOptionsAction);
-            });
-        }
+            context.UseMySQL(mySQLOptionsAction);
+        });
+    }
 
-        public static void UseMySQL<TDbContext>(
-            [NotNull] this AbpDbContextOptions options,
-            [CanBeNull] Action<MySqlDbContextOptionsBuilder> mySQLOptionsAction = null)
-            where TDbContext : AbpDbContext<TDbContext>
+    public static void UseMySQL<TDbContext>(
+        [NotNull] this AbpDbContextOptions options,
+        Action<MySql.EntityFrameworkCore.Infrastructure.MySQLDbContextOptionsBuilder>? mySQLOptionsAction = null)
+        where TDbContext : AbpDbContext<TDbContext>
+    {
+        options.Configure<TDbContext>(context =>
         {
-            options.Configure<TDbContext>(context =>
-            {
-                context.UseMySQL(mySQLOptionsAction);
-            });
-        }
+            context.UseMySQL(mySQLOptionsAction);
+        });
     }
 }

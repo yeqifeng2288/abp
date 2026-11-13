@@ -1,7 +1,7 @@
 {
   "culture": "ru",
   "texts": {
-    "Permission:DocumentManagement": "Управление документацией",
+    "Permission:DocumentManagement": "Управление документами",
     "Permission:Projects": "Проекты",
     "Permission:Edit": "Редактировать",
     "Permission:Delete": "Удалить",
@@ -37,12 +37,12 @@
     "DisplayName:LanguageCode": "Код языка",
     "DisplayName:Version": "Версия",
     "Documents": "Документы",
-    "RemoveFromCache": "Удалить из кеша",
+    "RemoveFromCache": "Удаление из кэша и повторное индексирование",
     "Reindex": "Переиндексировать",
     "ReindexCompleted": "Переиндекс завершен",
-    "RemovedFromCache": "Удалено из кеша",
+    "RemovedFromCache": "Удалены из кэша и переиндексированы",
     "RemoveFromCacheConfirmation": "Вы уверены, что хотите удалить этот элемент из кеша?",
-    "ReIndexDocumentConfirmation": "Вы уверены, что хотите переиндексировать этот элемент?",
+    "ReIndexDocumentConfirmation": "Вы уверены, что хотите переиндексировать \"{0}\"?",
     "DeleteFromDatabase": "Удалить из базы данных",
     "Deleted": "Удалено",
     "Search": "Поиск",
@@ -54,6 +54,21 @@
     "Version": "Версия",
     "LanguageCode": "Код языка",
     "FileName": "Имя файла",
-    "LastCachedTime": "Время кеширования"
+    "LastCachedTime": "Время кеширования",
+    "Project": "Проект",
+    "AdvancedFilters": "Расширенные фильтры",
+    "RemoveCacheAndReIndexConfirmation": "Документ \"{0}\" будет удален из кэша и переиндексирован. Вы подтверждаете?",
+    "GeneratePdf": "Генерировать PDF",
+    "Generating": "Генерация...",
+    "Language": "Язык",
+    "ForceToGenerateNewPdf": "Принудительное создание нового PDF",
+    "PdfGeneratedSuccessfully": "PDF успешно сгенерирован",
+    "GenerateAndDownloadPdf": "Сгенерировать и скачать PDF",
+    "PdfFileDeletionWarningMessage": "Вы уверены, что хотите удалить файл PDF \"{0}\"?",
+    "ManagePdfFiles": "Управление PDF файлами",
+    "Permission:ManagePdfFiles": "Управление PDF файлами",
+    "PdfDeletedSuccessfully": "PDF файл успешно удален",
+    "PdfGenerationStarted": "Началась генерация PDF",
+    "PdfGenerationStartedInfoMessage": "Началась генерация PDF. После завершения вы можете проверить, добавлен ли файл в раздел PDF файлов."
   }
 }

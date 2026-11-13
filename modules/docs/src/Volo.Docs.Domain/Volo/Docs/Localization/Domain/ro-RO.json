@@ -29,13 +29,18 @@
     "FullSearch": "Caută în documente",
     "Volo.Docs.Domain:010001": "Căutarea elastică nu este activată.",
     "MultipleVersionDocumentInfo": "Acest document are multiple versiuni. Selectaţi opţiunile cele mai potrivite pentru dumneavoastră.",
+    "DocumentOptions": "Opțiuni document",
     "New": "Nou",
     "Upd": "Upd",
     "NewExplanation": "Creat în ultimele două săptămâni.",
     "UpdatedExplanation": "Actualizat în ultimele două săptămâni.",
     "Volo.Docs.Domain:010002": "Numele pe scurt {ShortName} există deja.",
+    "Volo.Docs.Domain:010003": "Oops, documentul dorit nu a fost găsit!",
     "Preview": "previzualizare",
     "Search": "Caută",
-    "SearchResults": "Rezultatele căutării"
+    "SearchResults": "Rezultatele căutării",
+    "SearchInTheAllDocuments": "Căutați în toate documentele",
+    "GoogleTranslate": "Traducere Google",
+    "DownloadPDF": "Descărcare PDF"
   }
 }

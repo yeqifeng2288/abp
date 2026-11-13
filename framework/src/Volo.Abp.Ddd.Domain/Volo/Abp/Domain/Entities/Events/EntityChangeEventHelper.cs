@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -11,218 +12,197 @@ using Volo.Abp.EventBus.Distributed;
 using Volo.Abp.EventBus.Local;
 using Volo.Abp.Uow;
 
-namespace Volo.Abp.Domain.Entities.Events
+namespace Volo.Abp.Domain.Entities.Events;
+
+/// <summary>
+/// Used to trigger entity change events.
+/// </summary>
+public class EntityChangeEventHelper : IEntityChangeEventHelper, ITransientDependency
 {
-    /// <summary>
-    /// Used to trigger entity change events.
-    /// </summary>
-    public class EntityChangeEventHelper : IEntityChangeEventHelper, ITransientDependency
+    private const string UnitOfWorkEventRecordEntityPropName = "_Abp_Entity";
+
+    // Holds each constructor, so its compiled invoke stub stays alive. With Activator.CreateInstance, once many entity
+    // types are in use, a GC can drop the stub, and it is generated and compiled again on the next call.
+    private static readonly ConditionalWeakTable<Type, Func<object, object>> EventDataFactories = new();
+
+    public ILogger<EntityChangeEventHelper> Logger { get; set; }
+    public ILocalEventBus LocalEventBus { get; set; }
+    public IDistributedEventBus DistributedEventBus { get; set; }
+
+    protected IUnitOfWorkManager UnitOfWorkManager { get; }
+    protected IEntityToEtoMapper EntityToEtoMapper { get; }
+    protected AbpDistributedEntityEventOptions DistributedEntityEventOptions { get; }
+
+    public EntityChangeEventHelper(
+        IUnitOfWorkManager unitOfWorkManager,
+        IEntityToEtoMapper entityToEtoMapper,
+        IOptions<AbpDistributedEntityEventOptions> distributedEntityEventOptions)
     {
-        private const string UnitOfWorkEventRecordEntityPropName = "_Abp_Entity";
-        
-        public ILogger<EntityChangeEventHelper> Logger { get; set; }
-        public ILocalEventBus LocalEventBus { get; set; }
-        public IDistributedEventBus DistributedEventBus { get; set; }
+        UnitOfWorkManager = unitOfWorkManager;
+        EntityToEtoMapper = entityToEtoMapper;
+        DistributedEntityEventOptions = distributedEntityEventOptions.Value;
 
-        protected IUnitOfWorkManager UnitOfWorkManager { get; }
-        protected IEntityToEtoMapper EntityToEtoMapper { get; }
-        protected AbpDistributedEntityEventOptions DistributedEntityEventOptions { get; }
+        LocalEventBus = NullLocalEventBus.Instance;
+        DistributedEventBus = NullDistributedEventBus.Instance;
+        Logger = NullLogger<EntityChangeEventHelper>.Instance;
+    }
 
-        public EntityChangeEventHelper(
-            IUnitOfWorkManager unitOfWorkManager,
-            IEntityToEtoMapper entityToEtoMapper,
-            IOptions<AbpDistributedEntityEventOptions> distributedEntityEventOptions)
+    public virtual void PublishEntityCreatedEvent(object entity)
+    {
+        TriggerEventWithEntity(
+            LocalEventBus,
+            typeof(EntityCreatedEventData<>),
+            entity,
+            entity
+        );
+
+        if (ShouldPublishDistributedEventForEntity(entity))
         {
-            UnitOfWorkManager = unitOfWorkManager;
-            EntityToEtoMapper = entityToEtoMapper;
-            DistributedEntityEventOptions = distributedEntityEventOptions.Value;
-
-            LocalEventBus = NullLocalEventBus.Instance;
-            DistributedEventBus = NullDistributedEventBus.Instance;
-            Logger = NullLogger<EntityChangeEventHelper>.Instance;
-        }
-
-        public virtual void PublishEntityCreatingEvent(object entity)
-        {
-            TriggerEventWithEntity(
-                LocalEventBus,
-#pragma warning disable 618
-                typeof(EntityCreatingEventData<>),
-#pragma warning restore 618
-                entity,
-                entity
-            );
-        }
-
-        public virtual void PublishEntityCreatedEvent(object entity)
-        {
-            TriggerEventWithEntity(
-                LocalEventBus,
-                typeof(EntityCreatedEventData<>),
-                entity,
-                entity
-            );
-
-            if (ShouldPublishDistributedEventForEntity(entity))
+            var eto = EntityToEtoMapper.Map(entity);
+            if (eto != null)
             {
-                var eto = EntityToEtoMapper.Map(entity);
-                if (eto != null)
-                {
-                    TriggerEventWithEntity(
-                        DistributedEventBus,
-                        typeof(EntityCreatedEto<>),
-                        eto,
-                        entity
-                    );
-                }
-            }
-        }
-
-        private bool ShouldPublishDistributedEventForEntity(object entity)
-        {
-            return DistributedEntityEventOptions
-                .AutoEventSelectors
-                .IsMatch(
-                    ProxyHelper
-                        .UnProxy(entity)
-                        .GetType()
+                TriggerEventWithEntity(
+                    DistributedEventBus,
+                    typeof(EntityCreatedEto<>),
+                    eto,
+                    entity
                 );
-        }
-
-        public virtual void PublishEntityUpdatingEvent(object entity)
-        {
-            TriggerEventWithEntity(
-                LocalEventBus,
-#pragma warning disable 618
-                typeof(EntityUpdatingEventData<>),
-#pragma warning restore 618
-                entity,
-                entity
-            );
-        }
-
-        public virtual void PublishEntityUpdatedEvent(object entity)
-        {
-            TriggerEventWithEntity(
-                LocalEventBus,
-                typeof(EntityUpdatedEventData<>),
-                entity,
-                entity
-            );
-
-            if (ShouldPublishDistributedEventForEntity(entity))
-            {
-                var eto = EntityToEtoMapper.Map(entity);
-                if (eto != null)
-                {
-                    TriggerEventWithEntity(
-                        DistributedEventBus,
-                        typeof(EntityUpdatedEto<>),
-                        eto,
-                        entity
-                    );
-                }
             }
         }
+    }
 
-        public virtual void PublishEntityDeletingEvent(object entity)
+    private bool ShouldPublishDistributedEventForEntity(object entity)
+    {
+        var entityType = ProxyHelper.UnProxy(entity).GetType();
+        return !DistributedEntityEventOptions.IgnoredEventSelectors.IsMatch(entityType) &&
+               DistributedEntityEventOptions.AutoEventSelectors.IsMatch(entityType);
+    }
+
+    public virtual void PublishEntityUpdatedEvent(object entity)
+    {
+        TriggerEventWithEntity(
+            LocalEventBus,
+            typeof(EntityUpdatedEventData<>),
+            entity,
+            entity
+        );
+
+        if (ShouldPublishDistributedEventForEntity(entity))
         {
-            TriggerEventWithEntity(
-                LocalEventBus,
-#pragma warning disable 618
-                typeof(EntityDeletingEventData<>),
-#pragma warning restore 618
-                entity,
-                entity
-            );
-        }
-
-        public virtual void PublishEntityDeletedEvent(object entity)
-        {
-            TriggerEventWithEntity(
-                LocalEventBus,
-                typeof(EntityDeletedEventData<>),
-                entity,
-                entity
-            );
-
-            if (ShouldPublishDistributedEventForEntity(entity))
+            var eto = EntityToEtoMapper.Map(entity);
+            if (eto != null)
             {
-                var eto = EntityToEtoMapper.Map(entity);
-                if (eto != null)
-                {
-                    TriggerEventWithEntity(
-                        DistributedEventBus,
-                        typeof(EntityDeletedEto<>),
-                        eto,
-                        entity
-                    );
-                }
+                TriggerEventWithEntity(
+                    DistributedEventBus,
+                    typeof(EntityUpdatedEto<>),
+                    eto,
+                    entity
+                );
             }
         }
+    }
 
-        protected virtual void TriggerEventWithEntity(
-            IEventBus eventPublisher,
-            Type genericEventType,
-            object entityOrEto,
-            object originalEntity)
+    public virtual void PublishEntityDeletedEvent(object entity)
+    {
+        TriggerEventWithEntity(
+            LocalEventBus,
+            typeof(EntityDeletedEventData<>),
+            entity,
+            entity
+        );
+
+        if (ShouldPublishDistributedEventForEntity(entity))
         {
-            var entityType = ProxyHelper.UnProxy(entityOrEto).GetType();
-            var eventType = genericEventType.MakeGenericType(entityType);
-            var eventData = Activator.CreateInstance(eventType, entityOrEto);
-            var currentUow = UnitOfWorkManager.Current;
-            
-            if (currentUow == null)
+            var eto = EntityToEtoMapper.Map(entity);
+            if (eto != null)
             {
-                Logger.LogWarning("UnitOfWorkManager.Current is null! Can not publish the event.");
-                return;
+                TriggerEventWithEntity(
+                    DistributedEventBus,
+                    typeof(EntityDeletedEto<>),
+                    eto,
+                    entity
+                );
             }
-            
-            var eventRecord = new UnitOfWorkEventRecord(eventType, eventData, EventOrderGenerator.GetNext())
-            {
-                Properties =
+        }
+    }
+
+    protected virtual void TriggerEventWithEntity(
+        IEventBus eventPublisher,
+        Type genericEventType,
+        object entityOrEto,
+        object originalEntity)
+    {
+        var entityType = ProxyHelper.UnProxy(entityOrEto).GetType();
+        var eventType = genericEventType.MakeGenericType(entityType);
+        var eventData = CreateEventData(eventType, entityOrEto);
+        var currentUow = UnitOfWorkManager.Current;
+
+        if (currentUow == null)
+        {
+            Logger.LogWarning("UnitOfWorkManager.Current is null! Can not publish the event.");
+            return;
+        }
+
+        var eventRecord = new UnitOfWorkEventRecord(eventType, eventData, EventOrderGenerator.GetNext())
+        {
+            Properties =
                 {
                     { UnitOfWorkEventRecordEntityPropName, originalEntity },
                 }
-            };
-            
-            /* We are trying to eliminate same events for the same entity.
-             * In this way, for example, we don't trigger update event for an entity multiple times
-             * even if it is updated multiple times in the current UOW.
-             */
+        };
 
-            if (eventPublisher == DistributedEventBus)
-            {
-                currentUow.AddOrReplaceDistributedEvent(
-                    eventRecord,
-                    otherRecord => IsSameEntityEventRecord(eventRecord, otherRecord)
-                );
-            }
-            else
-            {
-                currentUow.AddOrReplaceLocalEvent(
-                    eventRecord,
-                    otherRecord => IsSameEntityEventRecord(eventRecord, otherRecord)
-                );
-            }
-        }
+        /* We are trying to eliminate same events for the same entity.
+         * In this way, for example, we don't trigger update event for an entity multiple times
+         * even if it is updated multiple times in the current UOW.
+         */
 
-        public bool IsSameEntityEventRecord(UnitOfWorkEventRecord record1, UnitOfWorkEventRecord record2)
+        if (eventPublisher == DistributedEventBus)
         {
-            if (record1.EventType != record2.EventType)
-            {
-                return false;
-            }
-
-            var record1OriginalEntity = record1.Properties.GetOrDefault(UnitOfWorkEventRecordEntityPropName) as IEntity;
-            var record2OriginalEntity = record2.Properties.GetOrDefault(UnitOfWorkEventRecordEntityPropName) as IEntity;
-
-            if (record1OriginalEntity == null || record2OriginalEntity == null)
-            {
-                return false;
-            }
-
-            return EntityHelper.EntityEquals(record1OriginalEntity, record2OriginalEntity);
+            currentUow.AddOrReplaceDistributedEvent(
+                eventRecord,
+                otherRecord => IsSameEntityEventRecord(eventRecord, otherRecord)
+            );
         }
+        else
+        {
+            currentUow.AddOrReplaceLocalEvent(
+                eventRecord,
+                otherRecord => IsSameEntityEventRecord(eventRecord, otherRecord)
+            );
+        }
+    }
+
+    private static object CreateEventData(Type eventType, object entityOrEto)
+    {
+        return EventDataFactories.GetValue(eventType, static type =>
+        {
+            var constructors = type.GetConstructors();
+            if (constructors.Length != 1 ||
+                Array.Exists(constructors[0].GetParameters(), static parameter => parameter.IsDefined(typeof(ParamArrayAttribute), false)))
+            {
+                return entity => Activator.CreateInstance(type, entity)!;
+            }
+
+            var constructor = constructors[0];
+            return entity => constructor.Invoke(new[] { entity });
+        })(entityOrEto);
+    }
+
+    public bool IsSameEntityEventRecord(UnitOfWorkEventRecord record1, UnitOfWorkEventRecord record2)
+    {
+        if (record1.EventType != record2.EventType)
+        {
+            return false;
+        }
+
+        var record1OriginalEntity = record1.Properties.GetOrDefault(UnitOfWorkEventRecordEntityPropName) as IEntity;
+        var record2OriginalEntity = record2.Properties.GetOrDefault(UnitOfWorkEventRecordEntityPropName) as IEntity;
+
+        if (record1OriginalEntity == null || record2OriginalEntity == null)
+        {
+            return false;
+        }
+
+        return EntityHelper.EntityEquals(record1OriginalEntity, record2OriginalEntity);
     }
 }

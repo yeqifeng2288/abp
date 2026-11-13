@@ -1,35 +1,33 @@
 ﻿using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore;
-using System;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using System;
 using Volo.Abp.EntityFrameworkCore.DependencyInjection;
+using Volo.Abp.EntityFrameworkCore.MySQL;
 
-namespace Volo.Abp.EntityFrameworkCore
+namespace Volo.Abp.EntityFrameworkCore;
+
+public static class AbpDbContextConfigurationContextMySQLExtensions
 {
-    public static class AbpDbContextConfigurationContextMySQLExtensions
+    public static DbContextOptionsBuilder UseMySQL(
+        [NotNull] this AbpDbContextConfigurationContext context,
+        Action<MySql.EntityFrameworkCore.Infrastructure.MySQLDbContextOptionsBuilder>? mySQLOptionsAction = null)
     {
-        public static DbContextOptionsBuilder UseMySQL(
-           [NotNull] this AbpDbContextConfigurationContext context,
-           [CanBeNull] Action<MySqlDbContextOptionsBuilder> mySQLOptionsAction = null)
-        {
-            if (context.ExistingConnection != null)
+        var dbContextOptionsBuilder = context.ExistingConnection != null
+            ? context.DbContextOptions.UseMySQL(context.ExistingConnection, optionsBuilder =>
             {
-                return context.DbContextOptions.UseMySql(context.ExistingConnection,
-                    ServerVersion.AutoDetect(context.ConnectionString), optionsBuilder =>
-                    {
-                        optionsBuilder.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-                        mySQLOptionsAction?.Invoke(optionsBuilder);
-                    });
-            }
-            else
+                optionsBuilder.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                mySQLOptionsAction?.Invoke(optionsBuilder);
+            })
+            : context.DbContextOptions.UseMySQL(context.ConnectionString, optionsBuilder =>
             {
-                return context.DbContextOptions.UseMySql(context.ConnectionString,
-                    ServerVersion.AutoDetect(context.ConnectionString), optionsBuilder =>
-                    {
-                        optionsBuilder.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-                        mySQLOptionsAction?.Invoke(optionsBuilder);
-                    });
-            }
-        }
+                optionsBuilder.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                mySQLOptionsAction?.Invoke(optionsBuilder);
+            });
+
+        ((IDbContextOptionsBuilderInfrastructure)dbContextOptionsBuilder)
+            .AddOrUpdateExtension(new AbpMySQLDbContextOptionsExtension());
+
+        return dbContextOptionsBuilder;
     }
 }

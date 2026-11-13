@@ -1,4 +1,30 @@
-import { ConfigStateService, CurrentUserDto } from '@abp/ng.core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DOCUMENT,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  TrackByFunction,
+  untracked,
+} from '@angular/core';
+import { NgStyle } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Tabs, TabList, Tab, TabPanel, TabContent } from '@angular/aria/tabs';
+import { of } from 'rxjs';
+import { finalize, switchMap, tap } from 'rxjs/operators';
+
+import { ConfigStateService, CurrentUserDto, LocalizationPipe } from '@abp/ng.core';
+import {
+  ButtonComponent,
+  LocaleDirection,
+  ModalCloseDirective,
+  ModalComponent,
+  ToasterService,
+} from '@abp/ng.theme.shared';
 import {
   GetPermissionListResultDto,
   PermissionGrantInfoDto,
@@ -7,227 +33,478 @@ import {
   ProviderInfoDto,
   UpdatePermissionDto,
 } from '@abp/ng.permission-management/proxy';
-import { LocaleDirection } from '@abp/ng.theme.shared';
-import {
-  Component,
-  ElementRef,
-  EventEmitter,
-  Input,
-  Output,
-  QueryList,
-  TrackByFunction,
-  ViewChildren,
-} from '@angular/core';
-import { concat, of } from 'rxjs';
-import { finalize, switchMap, take, tap } from 'rxjs/operators';
-import { PermissionManagement } from '../models/permission-management';
 
 type PermissionWithStyle = PermissionGrantInfoDto & {
-  style: string;
+  style: Record<string, number>;
+};
+
+type PermissionWithGroupName = PermissionGrantInfoDto & {
+  groupName: string;
+};
+
+type SelectAllCheckboxState = {
+  checked: boolean;
+  indeterminate: boolean;
 };
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'abp-permission-management',
   templateUrl: './permission-management.component.html',
   exportAs: 'abpPermissionManagement',
   styles: [
     `
-      .overflow-scroll {
-        max-height: 70vh;
-        overflow-y: scroll;
+      .scroll-in-modal {
+        overflow: auto;
+        /*
+        To maintain a 28px top margin and 28px bottom margin when the modal reaches full height, the scrollable area needs to be 100vh - 23.1rem
+         */
+        max-height: calc(100vh - 23.1rem);
+      }
+
+      .lpx-scroll-pills-container .nav-pills {
+        display: block;
+        overflow-y: auto;
+      }
+
+      /* Target mobile screens */
+      @media (max-width: 768px) {
+        .scroll-in-modal {
+          max-height: calc(100vh - 15rem);
+        }
+        .lpx-scroll-pills-container .nav-pills {
+          max-height: 500px;
+        }
+      }
+
+      fieldset legend {
+        float: none;
+        width: auto;
+      }
+
+      .lpx-scroll-pills-container .tab-content {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+      }
+
+      .lpx-scroll-pills-container .nav-item {
+        margin-bottom: 10px;
+        border-radius: 10px;
+      }
+
+      .lpx-scroll-pills-container .nav-item .nav-link.active {
+        color: #fff !important;
+        border-color: #6c5dd3 !important;
+        background-color: #6c5dd3 !important;
       }
     `,
   ],
+  imports: [
+    FormsModule,
+    NgStyle,
+    ModalComponent,
+    LocalizationPipe,
+    ButtonComponent,
+    ModalCloseDirective,
+    Tabs,
+    TabList,
+    Tab,
+    TabPanel,
+    TabContent,
+  ],
 })
-export class PermissionManagementComponent
-  implements
-    PermissionManagement.PermissionManagementComponentInputs,
-    PermissionManagement.PermissionManagementComponentOutputs
-{
-  @Input()
-  readonly providerName: string;
+export class PermissionManagementComponent {
+  protected readonly service = inject(PermissionsService);
+  protected readonly configState = inject(ConfigStateService);
+  protected readonly toasterService = inject(ToasterService);
+  private document = inject(DOCUMENT);
 
-  @Input()
-  readonly providerKey: string;
+  readonly providerNameInput = input('', { alias: 'providerName' });
+  readonly providerKeyInput = input('', { alias: 'providerKey' });
+  readonly hideBadgesInput = input(false, { alias: 'hideBadges' });
+  readonly entityDisplayName = input<string | undefined>(undefined);
+  readonly visibleInput = input(false, { alias: 'visible' });
 
-  @Input()
-  readonly hideBadges = false;
+  readonly visibleChange = output<boolean>();
 
-  protected _visible = false;
+  protected readonly modalVisible = signal(false);
+  protected readonly modalBusy = signal(false);
+  protected readonly filter = signal<string>('');
 
-  @Input()
-  get visible(): boolean {
-    return this._visible;
+  private isOpening = false;
+  private isClosingModal = false;
+
+  // Backward-compatible getters/setters for ReplaceableTemplateDirective.
+  private _providerNameOverride?: string;
+  get providerName(): string {
+    return this._providerNameOverride ?? this.providerNameInput();
+  }
+  set providerName(value: string) {
+    this._providerNameOverride = value;
   }
 
-  set visible(value: boolean) {
-    if (value === this._visible) return;
+  private _providerKeyOverride?: string;
+  get providerKey(): string {
+    return this._providerKeyOverride ?? this.providerKeyInput();
+  }
+  set providerKey(value: string) {
+    this._providerKeyOverride = value;
+  }
 
-    if (value) {
-      this.openModal().subscribe(() => {
-        this._visible = true;
-        this.visibleChange.emit(true);
-        concat(this.selectAllInAllTabsRef.changes, this.selectAllInThisTabsRef.changes)
-          .pipe(take(1))
-          .subscribe(() => {
-            this.initModal();
-          });
-      });
-    } else {
-      this.selectedGroup = null;
-      this._visible = false;
-      this.visibleChange.emit(false);
+  private _hideBadgesOverride?: boolean;
+  get hideBadges(): boolean {
+    return this._hideBadgesOverride ?? this.hideBadgesInput();
+  }
+  set hideBadges(value: boolean) {
+    this._hideBadgesOverride = value;
+  }
+
+  data: GetPermissionListResultDto = { groups: [], entityDisplayName: '' };
+
+  private readonly permissionsState = signal<PermissionWithGroupName[]>([]);
+  private readonly selectedGroupState = signal<PermissionGroupDto | null>(null);
+  private readonly permissionGroupSignal = signal<PermissionGroupDto[]>([]);
+
+  protected readonly selectedGroupPermissions = computed(() => {
+    const group = this.selectedGroupState();
+    if (!group) {
+      return [] as PermissionWithStyle[];
     }
-  }
 
-  @Output() readonly visibleChange = new EventEmitter<boolean>();
+    const margin = `margin-${
+      (this.document.body?.dir as LocaleDirection) === 'rtl' ? 'right' : 'left'
+    }.px`;
 
-  @ViewChildren('selectAllInThisTabsRef')
-  selectAllInThisTabsRef: QueryList<ElementRef<HTMLInputElement>>;
-  @ViewChildren('selectAllInAllTabsRef')
-  selectAllInAllTabsRef: QueryList<ElementRef<HTMLInputElement>>;
+    const groupPermissions =
+      this.permissionGroupSignal().find(item => item.name === group.name)?.permissions || [];
+    const permissions = this.permissionsState();
 
-  data: GetPermissionListResultDto = { groups: [], entityDisplayName: null };
+    return groupPermissions.map(permission => ({
+      ...permission,
+      style: { [margin]: findMargin(groupPermissions, permission) },
+      isGranted: (permissions.find(per => per.name === permission.name) || {}).isGranted,
+    })) as PermissionWithStyle[];
+  });
 
-  selectedGroup: PermissionGroupDto;
+  protected readonly selectThisTabState = computed(() =>
+    getSelectAllCheckboxState(this.selectedGroupPermissions()),
+  );
 
-  permissions: PermissionGrantInfoDto[] = [];
+  protected readonly selectAllTabState = computed(() =>
+    getSelectAllCheckboxState(this.permissionsState()),
+  );
 
-  selectThisTab = false;
+  // Disabled state is based on the API snapshot (not live edits) so select-all stays toggleable.
+  protected readonly disableSelectAllTab = computed(() =>
+    isSelectAllDisabled(this.selectedGroupState()?.permissions, this.providerName),
+  );
 
-  selectAllTab = false;
+  private readonly disabledSelectAllInAllTabsState = signal(false);
+  protected readonly disabledSelectAllInAllTabs = this.disabledSelectAllInAllTabsState.asReadonly();
 
-  modalBusy = false;
+  permissionGroups = computed(() => {
+    const search = this.filter().toLowerCase().trim();
+    const groups = this.permissionGroupSignal();
+
+    if (!search) {
+      return groups;
+    }
+
+    const includesSearch = (text: string) => text.toLowerCase().includes(search);
+    return groups.filter(group =>
+      group.permissions.some(
+        permission => includesSearch(permission.displayName) || includesSearch(group.displayName),
+      ),
+    );
+  });
 
   trackByFn: TrackByFunction<PermissionGroupDto> = (_, item) => item.name;
 
-  get selectedGroupPermissions(): PermissionWithStyle[] {
-    if (!this.selectedGroup) return [];
-
-    const margin = `margin-${
-      (document.body.dir as LocaleDirection) === 'rtl' ? 'right' : 'left'
-    }.px`;
-
-    const permissions = this.data.groups.find(
-      group => group.name === this.selectedGroup.name,
-    ).permissions;
-
-    return permissions.map(
-      permission =>
-        ({
-          ...permission,
-          style: { [margin]: findMargin(permissions, permission) },
-          isGranted: this.permissions.find(per => per.name === permission.name).isGranted,
-        } as unknown as PermissionWithStyle),
-    );
+  // Backward-compatible getters/setters for ReplaceableTemplateDirective.
+  get visible(): boolean {
+    return this.modalVisible();
   }
 
-  constructor(protected service: PermissionsService, protected configState: ConfigStateService) {}
+  set visible(value: boolean) {
+    this.setVisible(value);
+  }
+
+  private setVisible(value: boolean) {
+    if (value && this.isClosingModal) {
+      return;
+    }
+
+    if (value === this.modalVisible()) {
+      return;
+    }
+
+    if (value) {
+      this.showModal();
+    } else {
+      this.hideModal();
+    }
+  }
+
+  get permissions(): PermissionWithGroupName[] {
+    return this.permissionsState();
+  }
+
+  set permissions(value: PermissionWithGroupName[]) {
+    this.permissionsState.set(value);
+  }
+
+  get selectedGroup(): PermissionGroupDto | null | undefined {
+    return this.selectedGroupState();
+  }
+
+  get selectThisTab(): boolean {
+    return this.selectThisTabState().checked;
+  }
+
+  get selectAllTab(): boolean {
+    return this.selectAllTabState().checked;
+  }
+
+  onModalVisibleChange(value: boolean) {
+    this.visibleChange.emit(value);
+  }
+
+  onModalDisappear() {
+    setTimeout(() => {
+      if (!this.modalVisible()) {
+        this.resetModalState();
+      }
+      this.isClosingModal = false;
+    });
+  }
+
+  private showModal() {
+    if (this.isOpening || this.modalVisible()) {
+      return;
+    }
+
+    this.isClosingModal = false;
+    this.isOpening = true;
+    this.openModal()
+      .pipe(finalize(() => (this.isOpening = false)))
+      .subscribe(() => {
+        this.modalVisible.set(true);
+        this.visibleChange.emit(true);
+      });
+  }
+
+  private hideModal() {
+    if (!this.modalVisible()) {
+      return;
+    }
+
+    this.isClosingModal = true;
+    this.visibleChange.emit(false);
+    this.modalVisible.set(false);
+  }
+
+  private resetModalState() {
+    this.setSelectedGroup(null);
+    this.filter.set('');
+    this.disabledSelectAllInAllTabsState.set(false);
+  }
+
+  // constructor() {
+  //   effect(() => {
+  //     this.setVisible(this.visibleInput());
+  //   });
+  // }
+
+  constructor() {
+    effect(() => {
+      const visible = this.visibleInput();
+      untracked(() => this.setVisible(visible));
+    });
+  }
 
   getChecked(name: string) {
-    return (this.permissions.find(per => per.name === name) || { isGranted: false }).isGranted;
+    return (this.permissionsState().find(per => per.name === name) || { isGranted: false })
+      .isGranted;
   }
 
-  isGrantedByOtherProviderName(grantedProviders: ProviderInfoDto[]): boolean {
-    if (grantedProviders.length) {
+  setSelectedGroup(group: PermissionGroupDto | null) {
+    this.selectedGroupState.set(group);
+  }
+
+  isGrantedByOtherProviderName(grantedProviders?: ProviderInfoDto[]): boolean {
+    if (grantedProviders?.length) {
       return grantedProviders.findIndex(p => p.providerName !== this.providerName) > -1;
     }
     return false;
   }
 
-  onClickCheckbox(clickedPermission: PermissionGrantInfoDto, value) {
-    if (
-      clickedPermission.isGranted &&
-      this.isGrantedByOtherProviderName(clickedPermission.grantedProviders)
-    )
+  onClickCheckbox(clickedPermission: PermissionGrantInfoDto) {
+    const { isGranted, grantedProviders } = clickedPermission;
+    if (isGranted && this.isGrantedByOtherProviderName(grantedProviders)) {
       return;
+    }
 
     setTimeout(() => {
-      this.permissions = this.permissions.map(per => {
-        if (clickedPermission.name === per.name) {
-          return { ...per, isGranted: !per.isGranted };
-        } else if (clickedPermission.name === per.parentName && clickedPermission.isGranted) {
-          return { ...per, isGranted: false };
-        } else if (clickedPermission.parentName === per.name && !clickedPermission.isGranted) {
-          return { ...per, isGranted: true };
-        }
-
-        return per;
-      });
-
-      this.setTabCheckboxState();
-      this.setGrantCheckboxState();
+      this.updatePermissionStatus(clickedPermission);
+      this.setParentClicked(clickedPermission);
     }, 0);
   }
 
-  setTabCheckboxState() {
-    const selectedPermissions = this.selectedGroupPermissions.filter(per => per.isGranted);
-    const element = document.querySelector('#select-all-in-this-tabs') as any;
+  updatePermissionStatus(clickedPermission: PermissionGrantInfoDto) {
+    this.permissionsState.update(permissions =>
+      permissions.map(permission => {
+        const isExactMatch = clickedPermission.name == permission.name;
+        const isParentOfPermission = clickedPermission.parentName === permission.name;
+        const isChildOfPermission = clickedPermission.name === permission.parentName;
 
-    if (selectedPermissions.length === this.selectedGroupPermissions.length) {
-      element.indeterminate = false;
-      this.selectThisTab = true;
-    } else if (selectedPermissions.length === 0) {
-      element.indeterminate = false;
-      this.selectThisTab = false;
-    } else {
-      element.indeterminate = true;
-    }
+        if (isExactMatch) {
+          return { ...permission, isGranted: !permission.isGranted };
+        }
+
+        if (isChildOfPermission && permission.isGranted) {
+          return { ...permission, isGranted: false };
+        }
+
+        if (isParentOfPermission && !permission.isGranted) {
+          return { ...permission, isGranted: true };
+        }
+
+        return permission;
+      }),
+    );
   }
 
-  setGrantCheckboxState() {
-    const selectedAllPermissions = this.permissions.filter(per => per.isGranted);
-    const checkboxElement = document.querySelector('#select-all-in-all-tabs') as any;
+  setParentClicked(clickedPermission: PermissionGrantInfoDto) {
+    if (clickedPermission.parentName) {
+      const parentPermissions = findParentPermissions(this.permissionsState(), clickedPermission);
+      if (parentPermissions.length > 0) {
+        const parentNames = new Set(parentPermissions.map(parent => parent.name));
 
-    if (selectedAllPermissions.length === this.permissions.length) {
-      checkboxElement.indeterminate = false;
-      this.selectAllTab = true;
-    } else if (selectedAllPermissions.length === 0) {
-      checkboxElement.indeterminate = false;
-      this.selectAllTab = false;
-    } else {
-      checkboxElement.indeterminate = true;
+        this.permissionsState.update(permissions =>
+          permissions.map(per => {
+            let updatedIsGranted = per.isGranted;
+
+            if (per.parentName === clickedPermission.name && !clickedPermission.isGranted) {
+              updatedIsGranted = false;
+            }
+
+            if (parentNames.has(per.name)) {
+              updatedIsGranted = true;
+            }
+
+            return { ...per, isGranted: updatedIsGranted };
+          }),
+        );
+      }
+      return;
     }
+
+    this.permissionsState.update(permissions =>
+      permissions.map(per => {
+        const parents = findParentPermissions(permissions, per);
+        if (parents.length > 0) {
+          const rootParent = parents[parents.length - 1];
+
+          if (rootParent.name === clickedPermission.name && !rootParent.isGranted) {
+            return { ...per, isGranted: false };
+          }
+        }
+        return per;
+      }),
+    );
   }
 
-  onClickSelectThisTab() {
-    this.selectedGroupPermissions.forEach(permission => {
-      if (permission.isGranted && this.isGrantedByOtherProviderName(permission.grantedProviders))
-        return;
+  onSelectThisTabChange(event: Event) {
+    if (this.disableSelectAllTab()) {
+      return;
+    }
 
-      const index = this.permissions.findIndex(per => per.name === permission.name);
+    const state = this.selectThisTabState();
+    const checked = !state.checked || state.indeterminate;
 
-      this.permissions = [
-        ...this.permissions.slice(0, index),
-        { ...this.permissions[index], isGranted: !this.selectThisTab },
-        ...this.permissions.slice(index + 1),
-      ];
+    this.permissionsState.update(permissions => {
+      let updatedPermissions = [...permissions];
+
+      this.selectedGroupPermissions().forEach(permission => {
+        if (this.isGrantedByOtherProviderName(permission.grantedProviders)) {
+          return;
+        }
+
+        const index = updatedPermissions.findIndex(per => per.name === permission.name);
+        if (index < 0) {
+          return;
+        }
+
+        updatedPermissions = [
+          ...updatedPermissions.slice(0, index),
+          { ...updatedPermissions[index], isGranted: checked },
+          ...updatedPermissions.slice(index + 1),
+        ];
+      });
+
+      return updatedPermissions;
     });
-
-    this.setGrantCheckboxState();
   }
 
-  onClickSelectAll() {
-    this.permissions = this.permissions.map(permission => ({
-      ...permission,
-      isGranted:
-        this.isGrantedByOtherProviderName(permission.grantedProviders) || !this.selectAllTab,
-    }));
+  onSelectAllChange(event: Event) {
+    if (this.disabledSelectAllInAllTabs()) {
+      return;
+    }
 
-    this.selectThisTab = !this.selectAllTab;
+    const state = this.selectAllTabState();
+    const checked = !state.checked || state.indeterminate;
+
+    if (this.filter()) {
+      this.onFilterChange('');
+    }
+
+    this.permissionsState.update(permissions =>
+      permissions.map(permission => ({
+        ...permission,
+        isGranted: this.isGrantedByOtherProviderName(permission.grantedProviders) || checked,
+      })),
+    );
+  }
+
+  onFilterChange(value: string) {
+    this.filter.set(value);
+    this.syncSelectedGroupWithFilter();
+  }
+
+  private syncSelectedGroupWithFilter() {
+    const groups = this.permissionGroups();
+
+    if (!groups.length) {
+      this.setSelectedGroup(null);
+      return;
+    }
+
+    if (!groups.some(group => group.name === this.selectedGroupState()?.name)) {
+      this.onChangeGroup(groups[0]);
+    }
+  }
+
+  onTabChange(groupName: string) {
+    const group = this.permissionGroups().find(g => g.name === groupName);
+    if (group) {
+      this.onChangeGroup(group);
+    }
   }
 
   onChangeGroup(group: PermissionGroupDto) {
-    this.selectedGroup = group;
-    this.setTabCheckboxState();
+    this.setSelectedGroup(group);
   }
 
   submit() {
+    if (this.modalBusy()) {
+      return;
+    }
+
     const unchangedPermissions = getPermissions(this.data.groups);
 
-    const changedPermissions: UpdatePermissionDto[] = this.permissions
+    const changedPermissions: UpdatePermissionDto[] = this.permissionsState()
       .filter(per =>
-        unchangedPermissions.find(unchanged => unchanged.name === per.name).isGranted ===
+        (unchangedPermissions.find(unchanged => unchanged.name === per.name) || {}).isGranted ===
         per.isGranted
           ? false
           : true,
@@ -235,65 +512,124 @@ export class PermissionManagementComponent
       .map(({ name, isGranted }) => ({ name, isGranted }));
 
     if (!changedPermissions.length) {
-      this.visible = false;
+      this.hideModal();
       return;
     }
 
-    this.modalBusy = true;
+    this.modalBusy.set(true);
     this.service
       .update(this.providerName, this.providerKey, { permissions: changedPermissions })
       .pipe(
+        tap(() => this.hideModal()),
         switchMap(() =>
           this.shouldFetchAppConfig() ? this.configState.refreshAppState() : of(null),
         ),
-        finalize(() => (this.modalBusy = false)),
+        finalize(() => this.modalBusy.set(false)),
       )
       .subscribe(() => {
-        this.visible = false;
+        this.toasterService.success('AbpUi::SavedSuccessfully');
       });
   }
 
   openModal() {
-    if (!this.providerKey || !this.providerName) {
+    const providerName = this.providerName;
+    const providerKey = this.providerKey;
+
+    if (!providerKey || !providerName) {
       throw new Error('Provider Key and Provider Name are required.');
     }
 
-    return this.service.get(this.providerName, this.providerKey).pipe(
+    return this.service.get(providerName, providerKey).pipe(
       tap((permissionRes: GetPermissionListResultDto) => {
+        const { groups } = permissionRes || {};
+
         this.data = permissionRes;
-        this.selectedGroup = permissionRes.groups[0];
-        this.permissions = getPermissions(permissionRes.groups);
+        this.permissionGroupSignal.set(groups);
+        const permissions = getPermissions(groups);
+        this.permissionsState.set(permissions);
+        this.disabledSelectAllInAllTabsState.set(isSelectAllDisabled(permissions, providerName));
+        this.setSelectedGroup(groups[0] ?? null);
       }),
     );
   }
 
-  initModal() {
-    // TODO: Refactor
-    setTimeout(() => {
-      this.setTabCheckboxState();
-      this.setGrantCheckboxState();
-    });
-  }
-
   getAssignedCount(groupName: string) {
-    return this.permissions.reduce(
-      (acc, val) => (val.name.split('.')[0] === groupName && val.isGranted ? acc + 1 : acc),
+    return this.permissionsState().reduce(
+      (acc, val) => (val.groupName === groupName && val.isGranted ? acc + 1 : acc),
       0,
     );
   }
 
   shouldFetchAppConfig() {
     const currentUser = this.configState.getOne('currentUser') as CurrentUserDto;
+    const providerName = this.providerName;
+    const providerKey = this.providerKey;
 
-    if (this.providerName === 'R') return currentUser.roles.some(role => role === this.providerKey);
+    if (providerName === 'R') return currentUser.roles.some(role => role === providerKey);
 
-    if (this.providerName === 'U') return currentUser.id === this.providerKey;
+    if (providerName === 'U') return currentUser.id === providerKey;
 
     return false;
   }
 }
 
-function findMargin(permissions: PermissionGrantInfoDto[], permission: PermissionGrantInfoDto) {
+function isSelectAllDisabled(
+  permissions: PermissionGrantInfoDto[] | undefined,
+  providerName: string,
+): boolean {
+  if (!permissions?.length) {
+    return false;
+  }
+
+  return permissions.every(
+    permission =>
+      permission.isGranted &&
+      permission.grantedProviders?.every(p => p.providerName !== providerName),
+  );
+}
+
+function getSelectAllCheckboxState(permissions: PermissionGrantInfoDto[]): SelectAllCheckboxState {
+  if (!permissions.length) {
+    return { checked: false, indeterminate: false };
+  }
+
+  const grantedCount = permissions.filter(permission => permission.isGranted).length;
+
+  if (grantedCount === 0) {
+    return { checked: false, indeterminate: false };
+  }
+
+  if (grantedCount === permissions.length) {
+    return { checked: true, indeterminate: false };
+  }
+
+  return { checked: false, indeterminate: true };
+}
+
+function findParentPermissions(
+  permissions: PermissionGrantInfoDto[],
+  permission: PermissionGrantInfoDto,
+): PermissionGrantInfoDto[] {
+  const permissionMap = new Map(permissions.map(p => [p.name, p]));
+  let currentPermission = permissionMap.get(permission.name) ?? null;
+  const parentPermissions: PermissionGrantInfoDto[] = [];
+
+  while (currentPermission && currentPermission.parentName) {
+    const parentPermission = permissionMap.get(currentPermission.parentName);
+    if (!parentPermission) {
+      break;
+    }
+    parentPermissions.push(parentPermission);
+    currentPermission = parentPermission;
+  }
+
+  return parentPermissions;
+}
+
+function findMargin(
+  permissions: PermissionGrantInfoDto[],
+  permission: PermissionGrantInfoDto,
+): number {
   const parentPermission = permissions.find(per => per.name === permission.parentName);
 
   if (parentPermission && parentPermission.parentName) {
@@ -304,6 +640,12 @@ function findMargin(permissions: PermissionGrantInfoDto[], permission: Permissio
   return parentPermission ? 20 : 0;
 }
 
-function getPermissions(groups: PermissionGroupDto[]): PermissionGrantInfoDto[] {
-  return groups.reduce((acc, val) => [...acc, ...val.permissions], []);
+function getPermissions(groups: PermissionGroupDto[]): PermissionWithGroupName[] {
+  return groups.reduce(
+    (acc, val) => [
+      ...acc,
+      ...val.permissions.map<PermissionWithGroupName>(p => ({ ...p, groupName: val.name || '' })),
+    ],
+    [] as PermissionWithGroupName[],
+  );
 }

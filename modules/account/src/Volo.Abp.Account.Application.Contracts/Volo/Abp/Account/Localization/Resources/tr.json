@@ -1,6 +1,7 @@
 {
   "culture": "tr",
   "texts": {
+    "Menu:Account": "Hesap",
     "UserName": "Kullanıcı adı",
     "EmailAddress": "E-posta adresi",
     "UserNameOrEmailAddress": "Kullanıcı adı veya e-posta",
@@ -10,6 +11,8 @@
     "UserLockedOutMessage": "Kullanıcı hesabı hatalı giriş denemeleri nedeniyle kilitlenmiştir. Lütfen bir süre bekleyip tekrar deneyin.",
     "InvalidUserNameOrPassword": "Kullanıcı adı ya da şifre geçersiz!",
     "LoginIsNotAllowed": "Giriş yapmanıza izin verilmiyor! Hesabınız etkin değil veya e-postanızı/telefon numaranızı onaylamanız gerekiyor.",
+    "ExternalLoginPasswordChangeRequired": "Giriş yapmanıza izin verilmiyor! Şifrenizin değiştirilmesi gerekiyor, ancak bu harici bir girişle mümkün değil. Lütfen yöneticinizle iletişime geçin.",
+    "RegisteredButLoginIsNotAllowed": "Hesabınız oluşturuldu, ancak henüz giriş yapmanıza izin verilmiyor!",
     "SelfRegistrationDisabledMessage": "Bu uygulama için kullanıcıların kendi kendilerine kaydolmaları engellenmiştir. Yeni bir kullanıcı kaydetmek için lütfen uygulama yöneticisi ile iletişime geçin.",
     "LocalLoginDisabledMessage": "Bu uygulama için local login devre dışı bırakılmıştır.",
     "Login": "Giriş yap",
@@ -33,11 +36,14 @@
     "DisplayName:PhoneNumber": "Telefon numarası",
     "PersonalSettings": "Kişisel ayarlar",
     "PersonalSettingsSaved": "Kişisel ayarlar kaydedildi",
+    "PersonalSettingsChangedConfirmationModalTitle": "Kişisel bilgiler değişti",
+    "PersonalSettingsChangedConfirmationModalDescription": "Değişikliklerin yansıtılması için tekrar giriş yapmanız gerekmektedir. Şimdi oturumu kapatmak istiyor musunuz?",
     "PasswordChanged": "Şifre değiştirildi",
     "NewPasswordConfirmFailed": "Lütfen yeni şifreyi onaylayın.",
-    "Manage": "Manage",
+    "NewPasswordSameAsOld": "Yeni şifre eski şifre ile aynı olamaz.",
+    "Manage": "Yönet",
     "MyAccount": "Hesabım",
-    "DisplayName:Abp.Account.IsSelfRegistrationEnabled": "self-registration etkin mi ?",
+    "DisplayName:Abp.Account.IsSelfRegistrationEnabled": "Kendi kendine kayıt etkin mi?",
     "Description:Abp.Account.IsSelfRegistrationEnabled": "Bir kullanıcının hesabı kendisi tarafından kaydedip kaydedememesidir.",
     "DisplayName:Abp.Account.EnableLocalLogin": "Yerel bir hesapla kimlik doğrulaması",
     "Description:Abp.Account.EnableLocalLogin": "Sunucunun, kullanıcıların yerel bir hesapla kimlik doğrulamasına izin verip vermeyeceğini belirtir.",
@@ -49,7 +55,7 @@
     "SendPasswordResetLink_Information": "E-posta adresinize bir şifre sıfırlama bağlantısı gönderilecektir. Birkaç dakika içerisinde bir e-posta almazsanız lütfen tekrar deneyin.",
     "PasswordResetMailSentMessage": "E-posta adresinize bir şifre sıfırlama bağlantısı gönderilmiştir. Lütfen e-posta adresinizi kontrol ediniz. Eğer 15 dakika içinde, bu e-postayı gelen kutusunda bulamazsanız, gereksiz veya istenmeyen e-posta kutularına bakınız.",
     "ResetPassword": "Şifre Yenileme",
-    "ConfirmPassword": "Şifre (tekrar)",
+    "ConfirmPassword": "Şifre Onay",
     "ResetPassword_Information": "Lütfen yeni şifrenizi belirleyin.",
     "YourPasswordIsSuccessfullyReset": "Şifreniz başarıyla sıfırlandı.",
     "GoToTheApplication": "Uygulamaya git",
@@ -62,6 +68,10 @@
     "PasswordResetInfoInEmail": "Şifrenizi sıfırlamanız için bir talep aldık! Eğer bu talebi siz gerçekleştirmişseniz, şifrenizi sıfırlamak için bağlantıya tıklayın.",
     "ResetMyPassword": "Şifremi sıfırla",
     "AccessDenied": "Erişim reddedildi!",
-    "AccessDeniedMessage": "Bu kaynağa erişiminiz yok."
+    "AccessDeniedMessage": "Bu kaynağa erişiminiz yok.",
+    "OrRegisterWith": "Veya bunlarla kayıt ol:",
+    "RegisterUsingYourProviderAccount": "{0} hesabınızla kayıt olun.",
+    "RequireMigrateSeedTitle": "Yönetici kullanıcısı bulunamadı",
+    "RequireMigrateSeedMessage": "Lütfen veritabanı tohumunun yürütüldüğünden emin olun. Olası çözümler için <a target=\"_blank\" href=\"https://abp.io/kb/0003\">belgelere</a> bakın."
   }
 }

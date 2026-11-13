@@ -4,5 +4,9 @@
   "lib": {
     "entryFile": "src/public-api.ts"
   },
-  "allowedNonPeerDependencies": ["ng-zorro-antd", "chart.js"]
+  "allowedNonPeerDependencies": [
+    "ng-zorro-antd",
+    "@ctrl/tinycolor",
+    "chart.js"
+  ]
 }

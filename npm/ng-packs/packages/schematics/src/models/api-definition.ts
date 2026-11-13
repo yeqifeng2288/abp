@@ -20,6 +20,7 @@ export interface PropertyDef {
   type: string;
   typeSimple: string;
   isRequired: boolean;
+  isNullable: boolean;
 }
 
 export interface Module {
@@ -31,12 +32,32 @@ export interface Module {
 export interface Controller {
   controllerName: string;
   type: string;
+  isRemoteService: boolean;
+  isIntegrationService: boolean;
   interfaces: InterfaceDef[];
   actions: Record<string, Action>;
 }
 
 export interface InterfaceDef {
   type: string;
+  name: string;
+  methods?: InterfaceMethodDef[];
+}
+export interface InterfaceMethodDef {
+  name: string;
+  parametersOnMethod?: InterfaceParameterOnMethodDef[];
+  returnValue: {
+    type: string;
+    typeSimple: string;
+  };
+}
+export interface InterfaceParameterOnMethodDef {
+  name: string;
+  typeAsString: string;
+  type: string;
+  typeSimple: string;
+  isOptional: boolean;
+  defaultValue: unknown;
 }
 
 export interface Action {
@@ -47,7 +68,7 @@ export interface Action {
   supportedVersions: string[];
   parametersOnMethod: ParameterInSignature[];
   parameters: ParameterInBody[];
-  returnValue: TypeDef;
+  returnValue: ReturnValueDef;
 }
 
 export interface ParameterInSignature {
@@ -56,6 +77,7 @@ export interface ParameterInSignature {
   type: string;
   typeSimple: string;
   isOptional: boolean;
+  // eslint-disable-next-line
   defaultValue: any;
 }
 
@@ -66,6 +88,7 @@ export interface ParameterInBody {
   type: string;
   typeSimple: string;
   isOptional: boolean;
+  // eslint-disable-next-line
   defaultValue: any;
   constraintTypes: string[] | null;
   bindingSourceId: eBindingSourceId;
@@ -75,6 +98,11 @@ export interface ParameterInBody {
 export interface TypeDef {
   type: string;
   typeSimple: string;
+}
+
+export interface ReturnValueDef extends TypeDef {
+  contentTypes?: string[];
+  isRemoteStream?: boolean;
 }
 
 export interface TypeWithEnum {

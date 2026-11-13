@@ -4,7 +4,9 @@
     <Import Project="..\..\..\common.props" />
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <WarningsAsErrors>Nullable</WarningsAsErrors>
         <AssemblyName>Volo.Abp.EntityFrameworkCore.Oracle</AssemblyName>
         <PackageId>Volo.Abp.EntityFrameworkCore.Oracle</PackageId>
         <AssetTargetFallback>$(AssetTargetFallback);portable-net45+win8+wp8+wpa81;</AssetTargetFallback>
@@ -19,8 +21,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Oracle.EntityFrameworkCore" Version="5.21.4" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="$(MicrosoftPackageVersion)" />
+        <PackageReference Include="Oracle.EntityFrameworkCore" />
+        <!-- The provider has no EF Core 11 release yet and accepts only older EF Core versions.
+             Referencing EF Core directly makes this and the consuming projects use the EF Core version of ABP. -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     </ItemGroup>
 
 </Project>

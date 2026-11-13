@@ -1,9 +1,12 @@
 import { eBindingSourceId, eMethodModifier } from '../enums';
-import { camel } from '../utils/text';
+import { camel, camelizeHyphen } from '../utils/text';
+import { getParamName, getParamValueName, isDictionaryType } from '../utils/methods';
 import { ParameterInBody } from './api-definition';
 import { Property } from './model';
 import { Omissible } from './util';
+import { VOLO_REMOTE_STREAM_CONTENT } from '../constants';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const shouldQuote = require('should-quote');
 
 export class Method {
@@ -38,26 +41,43 @@ export class Body {
   body?: string;
   method: string;
   params: string[] = [];
+  dictParamVar?: string;
+  responseTypeWithNamespace: string;
   requestType = 'any';
   responseType: string;
+  httpResponseType?: 'json' | 'text' | 'blob' | 'arraybuffer';
+  acceptHeader?: string;
+  contentTypeHeader?: string;
   url: string;
 
   registerActionParameter = (param: ParameterInBody) => {
     const { bindingSourceId, descriptorName, jsonName, name, nameOnMethod } = param;
     const camelName = camel(name);
-    const paramName = jsonName || camelName;
-    const value = descriptorName
-      ? shouldQuote(paramName)
-        ? `${descriptorName}['${paramName}']`
-        : `${descriptorName}.${paramName}`
-      : nameOnMethod;
+    const paramName = jsonName || shouldQuote(name) ? name : camelName;
+    let value = camelizeHyphen(nameOnMethod);
+    if (descriptorName) {
+      value = getParamValueName(paramName, descriptorName);
+    }
 
     switch (bindingSourceId) {
       case eBindingSourceId.Model:
       case eBindingSourceId.Query:
-        this.params.push(paramName === value ? value : `${paramName}: ${value}`);
+        if (isDictionaryType(param.type, param.typeSimple)) {
+          this.dictParamVar = value;
+          break;
+        }
+        this.params.push(paramName === value ? value : `${getParamName(paramName)}: ${value}`);
+        break;
+      case eBindingSourceId.FormFile:
+        this.body = value;
         break;
       case eBindingSourceId.Body:
+        /* Angular sends a plain string body as text/plain, but the endpoint expects a JSON string. */
+        if (param.typeSimple === 'string') {
+          this.body = `JSON.stringify(${value})`;
+          this.contentTypeHeader = 'application/json';
+          break;
+        }
         this.body = value;
         break;
       case eBindingSourceId.Path:
@@ -75,6 +95,13 @@ export class Body {
     this.setUrlQuotes();
   }
 
+  isBlobMethod() {
+    if (this.httpResponseType === 'blob') {
+      return true;
+    }
+    return VOLO_REMOTE_STREAM_CONTENT.some(x => x === this.responseTypeWithNamespace);
+  }
+
   private setUrlQuotes() {
     this.url = /{/.test(this.url) ? `\`/${this.url}\`` : `'/${this.url}'`;
   }
@@ -82,5 +109,5 @@ export class Body {
 
 export type BodyOptions = Omissible<
   Omit<Body, 'registerActionParameter'>,
-  'params' | 'requestType'
+  'params' | 'requestType' | 'isBlobMethod'
 >;

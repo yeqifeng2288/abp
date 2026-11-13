@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using Volo.Abp.Application.Dtos;
+using Volo.Abp.Data;
 using Volo.Docs.Admin.Projects;
 using Volo.Docs.Projects;
 using Xunit;
@@ -29,14 +30,16 @@ namespace Volo.Docs
             projects.ShouldNotBeNull();
             projects.TotalCount.ShouldBe(1);
             projects.Items.ShouldContain(x => x.Name == "ABP vNext");
+            projects.Items.Single().GetProperty<string>("GitHubAccessToken").ShouldBe("123456");
         }
 
         [Fact]
         public async Task GetAsync()
         {
-            var project = await _projectAdminAppService.GetAsync(_testData.PorjectId);
+            var project = await _projectAdminAppService.GetAsync(_testData.ProjectId);
             project.ShouldNotBeNull();
-            project.Id.ShouldBe(_testData.PorjectId);
+            project.Id.ShouldBe(_testData.ProjectId);
+            project.GetProperty<string>("GitHubAccessToken").ShouldBe("123456");
         }
 
         [Fact]
@@ -77,6 +80,7 @@ namespace Volo.Docs
             projectDto.DocumentStoreType.ShouldBe(createProjectDto.DocumentStoreType);
 
             projectDto.ExtraProperties.Except(createProjectDto.ExtraProperties).Any().ShouldBe(false);
+            projectDto.GetProperty<string>("GitHubAccessToken").ShouldBe("123456");
         }
 
         [Fact]
@@ -96,7 +100,7 @@ namespace Volo.Docs
             };
             updateProjectDto.ExtraProperties.Add("test", "test");
 
-            var projectDto = await _projectAdminAppService.UpdateAsync(_testData.PorjectId, updateProjectDto);
+            var projectDto = await _projectAdminAppService.UpdateAsync(_testData.ProjectId, updateProjectDto);
 
 
             projectDto.ShouldNotBeNull();
@@ -109,14 +113,15 @@ namespace Volo.Docs
             projectDto.MainWebsiteUrl.ShouldBe(updateProjectDto.MainWebsiteUrl);
             projectDto.LatestVersionBranchName.ShouldBe(updateProjectDto.LatestVersionBranchName);
             projectDto.ExtraProperties.ShouldContainKey("test");
+            projectDto.GetProperty<string>("GitHubAccessToken").ShouldBe("123456");
         }
 
         [Fact]
         public async Task DeleteAsync()
         {
-            (await _projectRepository.GetAsync(_testData.PorjectId)).ShouldNotBeNull();
+            (await _projectRepository.GetAsync(_testData.ProjectId)).ShouldNotBeNull();
 
-            await _projectAdminAppService.DeleteAsync(_testData.PorjectId);
+            await _projectAdminAppService.DeleteAsync(_testData.ProjectId);
 
             (await _projectRepository.GetListAsync()).ShouldBeEmpty();
         }

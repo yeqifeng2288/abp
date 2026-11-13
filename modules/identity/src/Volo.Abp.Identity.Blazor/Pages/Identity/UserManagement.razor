@@ -1,4 +1,5 @@
 ﻿@page "/identity/users"
+@page "/{culture}/identity/users"
 @attribute [Authorize(IdentityPermissions.Users.Default)]
 @using Microsoft.AspNetCore.Authorization
 @using Volo.Abp.PermissionManagement.Blazor.Components
@@ -6,6 +7,9 @@
 @using Volo.Abp.Identity.Localization
 @using Volo.Abp.AspNetCore.Components.Web.Theming.Layout
 @inject AbpBlazorMessageLocalizerHelper<IdentityResource> LH
+@using Microsoft.Extensions.Localization
+@using Volo.Abp.UI.Navigation.Localization.Resource
+@inject IStringLocalizer<AbpUiNavigationResource> LUiNavigation
 
 @inherits AbpCrudPageBase<IIdentityUserAppService, IdentityUserDto, Guid, GetIdentityUsersInput, IdentityUserCreateDto, IdentityUserUpdateDto>
 
@@ -14,10 +18,19 @@
         @* ************************* PAGE HEADER ************************* *@
         <PageHeader Title="@L["Users"]"
                     BreadcrumbItems="@BreadcrumbItems"
-                    Toolbar="@Toolbar">
-        </PageHeader>
+                    Toolbar="@Toolbar" />
     </CardHeader>
-    <CardBody>
+    <CardBody class="row">
+
+        <Column ColumnSize="ColumnSize.Is8">
+        </Column>
+        <Column ColumnSize="ColumnSize.Is4" class="form-group row" style="text-align:right;">
+            <label for="inputPassword" class="col-sm-4 col-form-label pt-1">  @L["Search"] </label>
+            <div class="col-sm-8">
+                <TextInput class="form-control-sm" id="inputPassword" Value="@GetListInput.Filter" ValueChanged="@OnSearchTextChanged" />
+            </div>
+        </Column>
+
         @* ************************* DATA GRID ************************* *@
         <AbpExtensibleDataGrid TItem="IdentityUserDto"
                                Data="Entities"
@@ -32,14 +45,14 @@
 </Card>
 
 @* ************************* CREATE MODAL ************************* *@
-@if ( HasCreatePermission )
+@if (HasCreatePermission)
 {
-    <Modal @ref="CreateModal" Closing="@ClosingCreateModal">
-        <ModalContent Centered="true">
-            <Form>
+    <Modal @ref="CreateModal" Closing="@ClosingCreateModal" Centered="true">
+        <ModalContent>
+            <Form id="CreateUserForm">
                 <ModalHeader>
                     <ModalTitle>@L["NewUser"]</ModalTitle>
-                    <CloseButton Clicked="CloseCreateModalAsync"/>
+                    <CloseButton Clicked="CloseCreateModalAsync" />
                 </ModalHeader>
                 <ModalBody>
                     <Validations @ref="@CreateValidationsRef" Model="@NewEntity" ValidateOnLoad="false">
@@ -52,82 +65,92 @@
                                 <TabPanel Name="UserInformations">
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
-                                            <FieldLabel>@L["DisplayName:UserName"]</FieldLabel>
-                                            <TextEdit @bind-Text="NewEntity.UserName" Autofocus="true">
+                                            <FieldLabel>@L["DisplayName:UserName"] *</FieldLabel>
+                                            <TextInput @bind-Value="NewEntity.UserName" Autofocus="true">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
                                             <FieldLabel>@L["DisplayName:Name"]</FieldLabel>
-                                            <TextEdit @bind-Text="NewEntity.Name">
+                                            <TextInput @bind-Value="NewEntity.Name">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
                                             <FieldLabel>@L["DisplayName:Surname"]</FieldLabel>
-                                            <TextEdit @bind-Text="NewEntity.Surname">
+                                            <TextInput @bind-Value="NewEntity.Surname">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
-                                            <FieldLabel>@L["DisplayName:Password"]</FieldLabel>
-                                            <TextEdit Role="TextRole.Password" @bind-Text="NewEntity.Password">
-                                                <Feedback>
-                                                    <ValidationError/>
-                                                </Feedback>
-                                            </TextEdit>
+                                            <FieldLabel>@L["DisplayName:Password"] *</FieldLabel>
+                                            <Addons>
+                                                <Addon AddonType="AddonType.Body">
+                                                    <TextInput Role="@_passwordTextRole" @bind-Value="NewEntity.Password">
+                                                    </TextInput>
+                                                </Addon>
+                                                <Addon AddonType="AddonType.End">
+                                                    <Button Color="Color.Secondary" Clicked="@(() => ChangePasswordTextRole(null))"
+                                                            aria-label="@UiLocalizer["ShowPassword"]" aria-pressed="@(ShowPassword ? "true" : "false")">
+                                                        <Icon Name="ShowPassword ? IconName.Eye : IconName.EyeSlash" aria-hidden="true" />
+                                                    </Button>
+                                                </Addon>
+                                            </Addons>
+                                            <ValidationError Style="display: block" />
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
-                                            <FieldLabel>@L["DisplayName:Email"]</FieldLabel>
-                                            <TextEdit @bind-Text="NewEntity.Email">
+                                            <FieldLabel>@L["DisplayName:Email"] *</FieldLabel>
+                                            <TextInput @bind-Value="NewEntity.Email">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
                                             <FieldLabel>@L["DisplayName:PhoneNumber"]</FieldLabel>
-                                            <TextEdit @bind-Text="NewEntity.PhoneNumber">
+                                            <TextInput @bind-Value="NewEntity.PhoneNumber">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Field>
-                                        <Check TValue="bool" @bind-Checked="@NewEntity.IsActive">@L["DisplayName:IsActive"]</Check>
+                                        <Check TValue="bool" @bind-Value="@NewEntity.IsActive">@L["DisplayName:IsActive"]</Check>
                                     </Field>
                                     <Field>
-                                        <Check TValue="bool" @bind-Checked="@NewEntity.LockoutEnabled">@L["DisplayName:LockoutEnabled"]</Check>
+                                        <Tooltip Text="@L["Description:LockoutEnabled"].Value" style="width: fit-content;" Placement="TooltipPlacement.Right" >
+                                            <Check TValue="bool" @bind-Value="@NewEntity.LockoutEnabled">@L["DisplayName:LockoutEnabled"] <Icon Name="IconName.InfoCircle"/> </Check>
+                                        </Tooltip>
                                     </Field>
-                                    <ExtensionProperties TEntityType="IdentityUserCreateDto" TResourceType="IdentityResource" Entity="@NewEntity" LH="@LH"/>
+                                    <ExtensionProperties TEntityType="IdentityUserCreateDto" TResourceType="IdentityResource" Entity="@NewEntity" LH="@LH" ModalType="ExtensionPropertyModalType.CreateModal" />
                                 </TabPanel>
                                 <TabPanel Name="Roles">
-                                    @if ( NewUserRoles != null )
+                                    @if (NewUserRoles != null)
                                     {
-                                        @foreach ( var role in NewUserRoles )
-                                        {
-                                            <Field>
-                                                <input type="hidden" @bind-value="@role.Name"/>
-                                                <Check TValue="bool" @bind-Checked="@role.IsAssigned">@role.Name</Check>
-                                            </Field>
-                                        }
+                                            @foreach (var role in NewUserRoles)
+                                            {
+                                                <Field>
+                                                    <input type="hidden" @bind-value="@role.Name" />
+                                                    <Check TValue="bool" @bind-Value="@role.IsAssigned" Disabled="@(!role.IsAssignable)">@role.Name</Check>
+                                                </Field>
+                                            }
                                     }
                                 </TabPanel>
                             </Content>
@@ -135,8 +158,8 @@
                     </Validations>
                 </ModalBody>
                 <ModalFooter>
-                    <Button Color="Color.Secondary" Clicked="CloseCreateModalAsync">@L["Cancel"]</Button>
-                    <SubmitButton Clicked="@CreateEntityAsync"/>
+                    <Button Color="Color.Primary" Outline Clicked="CloseCreateModalAsync">@L["Cancel"]</Button>
+                    <SubmitButton Form="CreateUserForm" Clicked="@CreateEntityAsync" />
                 </ModalFooter>
             </Form>
         </ModalContent>
@@ -144,120 +167,139 @@
 }
 
 @* ************************* EDIT MODAL ************************* *@
-@if ( HasUpdatePermission )
+@if (HasUpdatePermission)
 {
-    <Modal @ref="EditModal" Closing="@ClosingEditModal">
-        <ModalContent Centered="true">
-            <Form>
+    <Modal @ref="EditModal" Closing="@ClosingEditModal" Centered="true">
+        <ModalContent>
+            <Form id="EditUserForm">
                 <ModalHeader>
                     <ModalTitle>@L["Edit"]</ModalTitle>
-                    <CloseButton Clicked="CloseEditModalAsync"/>
+                    <CloseButton Clicked="CloseEditModalAsync" />
                 </ModalHeader>
                 <ModalBody>
                     <Validations @ref="@EditValidationsRef" Model="@EditingEntity" ValidateOnLoad="false">
-                        <input type="hidden" name="ConcurrencyStamp" @bind-value="EditingEntity.ConcurrencyStamp"/>
+                        <input type="hidden" name="ConcurrencyStamp" @bind-value="EditingEntity.ConcurrencyStamp" />
 
                         <Tabs @bind-SelectedTab="@EditModalSelectedTab">
                             <Items>
                                 <Tab Name="UserInformations">@L["UserInformations"]</Tab>
-                                <Tab Name="Roles">@L["Roles"]</Tab>
+                                @if (EditUserRoles != null && EditUserRoles.Any())
+                                {
+                                    <Tab Name="Roles">@L["Roles"]</Tab>
+                                }
                             </Items>
                             <Content>
                                 <TabPanel Name="UserInformations">
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
-                                            <FieldLabel>@L["DisplayName:UserName"]</FieldLabel>
-                                            <TextEdit @bind-Text="EditingEntity.UserName" Autofocus="true">
+                                            <FieldLabel>@L["DisplayName:UserName"] *</FieldLabel>
+                                            <TextInput @bind-Value="EditingEntity.UserName" Autofocus="true">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
                                             <FieldLabel>@L["DisplayName:Name"]</FieldLabel>
-                                            <TextEdit @bind-Text="EditingEntity.Name">
+                                            <TextInput @bind-Value="EditingEntity.Name">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
                                             <FieldLabel>@L["DisplayName:Surname"]</FieldLabel>
-                                            <TextEdit @bind-Text="EditingEntity.Surname">
+                                            <TextInput @bind-Value="EditingEntity.Surname">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
                                             <FieldLabel>@L["DisplayName:Password"]</FieldLabel>
-                                            <TextEdit Role="TextRole.Password" @bind-Text="EditingEntity.Password">
-                                                <Feedback>
-                                                    <ValidationError/>
-                                                </Feedback>
-                                            </TextEdit>
+                                            <Addons>
+                                                <Addon AddonType="AddonType.Body">
+                                                    <TextInput Role="@_passwordTextRole" @bind-Value="EditingEntity.Password">
+                                                    </TextInput>
+                                                </Addon>
+                                                <Addon AddonType="AddonType.End">
+                                                    <Button Color="Color.Secondary" Clicked="@(() => ChangePasswordTextRole(null))"
+                                                            aria-label="@UiLocalizer["ShowPassword"]" aria-pressed="@(ShowPassword ? "true" : "false")">
+                                                        <Icon Name="ShowPassword ? IconName.Eye : IconName.EyeSlash" aria-hidden="true" />
+                                                    </Button>
+                                                </Addon>
+                                            </Addons>
+                                            <ValidationError Style="display: block" />
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
-                                            <FieldLabel>@L["DisplayName:Email"]</FieldLabel>
-                                            <TextEdit @bind-Text="EditingEntity.Email">
+                                            <FieldLabel>@L["DisplayName:Email"] *</FieldLabel>
+                                            <TextInput @bind-Value="EditingEntity.Email">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
                                     <Validation MessageLocalizer="@LH.Localize">
                                         <Field>
                                             <FieldLabel>@L["DisplayName:PhoneNumber"]</FieldLabel>
-                                            <TextEdit @bind-Text="EditingEntity.PhoneNumber">
+                                            <TextInput @bind-Value="EditingEntity.PhoneNumber">
                                                 <Feedback>
-                                                    <ValidationError/>
+                                                    <ValidationError />
                                                 </Feedback>
-                                            </TextEdit>
+                                            </TextInput>
                                         </Field>
                                     </Validation>
-                                    <Field>
-                                        <Check TValue="bool" @bind-Checked="EditingEntity.IsActive">@L["DisplayName:IsActive"]</Check>
-                                    </Field>
-                                    <Field>
-                                        <Check TValue="bool" @bind-Checked="EditingEntity.LockoutEnabled">@L["DisplayName:LockoutEnabled"]</Check>
-                                    </Field>
-                                    <ExtensionProperties TEntityType="IdentityUserUpdateDto" TResourceType="IdentityResource" Entity="@EditingEntity" LH="@LH"/>
-                                </TabPanel>
-                                <TabPanel Name="Roles">
-                                    @if ( EditUserRoles != null )
+                                    @if (!IsEditCurrentUser)
                                     {
-                                        @foreach ( var role in EditUserRoles )
-                                        {
-                                            <Field>
-                                                <input type="hidden" @bind-value="@role.Name"/>
-                                                <Check TValue="bool" @bind-Checked="@role.IsAssigned">@role.Name</Check>
-                                            </Field>
-                                        }
+                                        <Field>
+                                            <Check TValue="bool" @bind-Value="EditingEntity.IsActive">@L["DisplayName:IsActive"]</Check>
+                                        </Field>
                                     }
+                                    <Field>
+                                            <Tooltip Text="@L["Description:LockoutEnabled"].Value" style="width: fit-content;" Placement="TooltipPlacement.Right" >
+                                                <Check TValue="bool" @bind-Value="EditingEntity.LockoutEnabled">@L["DisplayName:LockoutEnabled"] <Icon Name="IconName.InfoCircle"/> </Check>
+                                            </Tooltip>
+                                        </Field>
+                                    <ExtensionProperties TEntityType="IdentityUserUpdateDto" TResourceType="IdentityResource" Entity="@EditingEntity" LH="@LH" ModalType="ExtensionPropertyModalType.EditModal" />
                                 </TabPanel>
+                                @if (EditUserRoles != null && EditUserRoles.Any())
+                                {
+                                    <TabPanel Name="Roles">
+                                        @if (EditUserRoles != null)
+                                        {
+                                            @foreach (var role in EditUserRoles)
+                                            {
+                                                <Field>
+                                                    <input type="hidden" @bind-value="@role.Name" />
+                                                    <Check TValue="bool" @bind-Value="@role.IsAssigned" Disabled="@(!role.IsAssignable)">@role.Name</Check>
+                                                </Field>
+                                            }
+                                        }
+                                    </TabPanel>
+                                }
                             </Content>
                         </Tabs>
                     </Validations>
                 </ModalBody>
                 <ModalFooter>
-                    <Button Color="Color.Secondary" Clicked="CloseEditModalAsync">@L["Cancel"]</Button>
-                    <SubmitButton Clicked="@UpdateEntityAsync"/>
+                    <Button Color="Color.Primary" Outline Clicked="CloseEditModalAsync">@L["Cancel"]</Button>
+                    <SubmitButton Form="EditUserForm" Clicked="@UpdateEntityAsync" />
                 </ModalFooter>
             </Form>
         </ModalContent>
     </Modal>
 }
 
-@if ( HasManagePermissionsPermission )
+@if (HasManagePermissionsPermission)
 {
-    <PermissionManagementModal @ref="PermissionManagementModal"/>
+    <PermissionManagementModal @ref="PermissionManagementModal" />
 }

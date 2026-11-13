@@ -2,151 +2,258 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Internal;
+using Volo.Abp.Internal.Telemetry;
+using Volo.Abp.Internal.Telemetry.Constants;
 using Volo.Abp.Logging;
 using Volo.Abp.Modularity;
+using Volo.Abp.Threading;
 
-namespace Volo.Abp
+namespace Volo.Abp;
+
+public abstract class AbpApplicationBase : IAbpApplication
 {
-    public abstract class AbpApplicationBase : IAbpApplication
+    [NotNull]
+    public Type StartupModuleType { get; }
+
+    public IServiceProvider ServiceProvider { get; private set; } = default!;
+
+    public IServiceCollection Services { get; }
+
+    public IReadOnlyList<IAbpModuleDescriptor> Modules { get; }
+
+    public string? ApplicationName { get; }
+
+    public string InstanceId { get; } = Guid.NewGuid().ToString();
+
+    private bool _configuredServices;
+
+    internal AbpApplicationBase(
+        [NotNull] Type startupModuleType,
+        [NotNull] IServiceCollection services,
+        Action<AbpApplicationCreationOptions>? optionsAction)
     {
-        [NotNull]
-        public Type StartupModuleType { get; }
+        Check.NotNull(startupModuleType, nameof(startupModuleType));
+        Check.NotNull(services, nameof(services));
 
-        public IServiceProvider ServiceProvider { get; private set; }
+        StartupModuleType = startupModuleType;
+        Services = services;
 
-        public IServiceCollection Services { get; }
+        services.TryAddObjectAccessor<IServiceProvider>();
 
-        public IReadOnlyList<IAbpModuleDescriptor> Modules { get; }
+        var options = new AbpApplicationCreationOptions(services);
+        optionsAction?.Invoke(options);
 
-        internal AbpApplicationBase(
-            [NotNull] Type startupModuleType,
-            [NotNull] IServiceCollection services,
-            [CanBeNull] Action<AbpApplicationCreationOptions> optionsAction)
+        ApplicationName = GetApplicationName(options);
+
+        services.AddSingleton<IAbpApplication>(this);
+        services.AddSingleton<IApplicationInfoAccessor>(this);
+        services.AddSingleton<IModuleContainer>(this);
+        services.AddSingleton<IAbpHostEnvironment>(new AbpHostEnvironment()
         {
-            Check.NotNull(startupModuleType, nameof(startupModuleType));
-            Check.NotNull(services, nameof(services));
+            EnvironmentName = options.Environment
+        });
 
-            StartupModuleType = startupModuleType;
-            Services = services;
+        services.AddCoreServices();
+        services.AddCoreAbpServices(this, options);
 
-            services.TryAddObjectAccessor<IServiceProvider>();
+        Modules = LoadModules(services, options);
 
-            var options = new AbpApplicationCreationOptions(services);
-            optionsAction?.Invoke(options);
-
-            services.AddSingleton<IAbpApplication>(this);
-            services.AddSingleton<IModuleContainer>(this);
-
-            services.AddCoreServices();
-            services.AddCoreAbpServices(this, options);
-
-            Modules = LoadModules(services, options);
+        if (!options.SkipConfigureServices)
+        {
             ConfigureServices();
         }
+    }
 
-        public virtual void Shutdown()
+    public virtual async Task ShutdownAsync()
+    {
+        using (var scope = ServiceProvider.CreateScope())
         {
-            using (var scope = ServiceProvider.CreateScope())
+            await scope.ServiceProvider
+                .GetRequiredService<IModuleManager>()
+                .ShutdownModulesAsync(new ApplicationShutdownContext(scope.ServiceProvider));
+        }
+    }
+
+    public virtual void Shutdown()
+    {
+        using (var scope = ServiceProvider.CreateScope())
+        {
+            scope.ServiceProvider
+                .GetRequiredService<IModuleManager>()
+                .ShutdownModules(new ApplicationShutdownContext(scope.ServiceProvider));
+        }
+    }
+
+    public virtual void Dispose()
+    {
+        //TODO: Shutdown if not done before?
+    }
+
+    protected virtual void SetServiceProvider(IServiceProvider serviceProvider)
+    {
+        ServiceProvider = serviceProvider;
+        ServiceProvider.GetRequiredService<ObjectAccessor<IServiceProvider>>().Value = ServiceProvider;
+    }
+
+    protected virtual async Task InitializeModulesAsync()
+    {
+        using (var scope = ServiceProvider.CreateScope())
+        {
+            WriteInitLogs(scope.ServiceProvider);
+            await scope.ServiceProvider
+                .GetRequiredService<IModuleManager>()
+                .InitializeModulesAsync(new ApplicationInitializationContext(scope.ServiceProvider));
+        }
+    }
+
+    protected virtual void InitializeModules()
+    {
+        using (var scope = ServiceProvider.CreateScope())
+        {
+            WriteInitLogs(scope.ServiceProvider);
+            scope.ServiceProvider
+                .GetRequiredService<IModuleManager>()
+                .InitializeModules(new ApplicationInitializationContext(scope.ServiceProvider));
+        }
+    }
+
+    protected virtual void WriteInitLogs(IServiceProvider serviceProvider)
+    {
+        var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+        if (loggerFactory == null)
+        {
+            return;
+        }
+
+        var initLoggerFactory = serviceProvider.GetRequiredService<IInitLoggerFactory>();
+
+        foreach (var entry in initLoggerFactory.GetAllEntries())
+        {
+            var categoryName = string.IsNullOrEmpty(entry.CategoryName)
+                ? nameof(AbpApplicationBase)
+                : entry.CategoryName;
+            var logger = loggerFactory.CreateLogger(categoryName);
+            logger.Log(entry.LogLevel, entry.EventId, entry.State, entry.Exception, entry.Formatter);
+        }
+
+        initLoggerFactory.ClearAllEntries();
+    }
+
+    protected virtual IReadOnlyList<IAbpModuleDescriptor> LoadModules(IServiceCollection services, AbpApplicationCreationOptions options)
+    {
+        return services
+            .GetSingletonInstance<IModuleLoader>()
+            .LoadModules(
+                services,
+                StartupModuleType,
+                options.PlugInSources
+            );
+    }
+    protected void SetupTelemetryTracking()
+    {
+        if (!ShouldSendTelemetryData())
+        {
+            return;
+        }
+
+        AsyncHelper.RunSync(InitializeTelemetryTracking);
+    }
+
+    protected async Task SetupTelemetryTrackingAsync()
+    {
+        if (!ShouldSendTelemetryData())
+        {
+            return;
+        }
+
+        await InitializeTelemetryTracking();
+    }
+
+    private async Task InitializeTelemetryTracking()
+    {
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var telemetryService = scope.ServiceProvider.GetRequiredService<ITelemetryService>();
+            await telemetryService.AddActivityAsync(ActivityNameConsts.ApplicationRun);
+        }
+        catch (Exception ex)
+        {
+            try
             {
-                scope.ServiceProvider
-                    .GetRequiredService<IModuleManager>()
-                    .ShutdownModules(new ApplicationShutdownContext(scope.ServiceProvider));
+                var logger = Services.GetInitLogger<AbpApplicationBase>();
+                logger.LogException(ex, LogLevel.Trace);
+            }
+            catch
+            {
+                /* ignored */
+            }
+        }
+    }
+
+    private bool ShouldSendTelemetryData()
+    {
+        using var scope = ServiceProvider.CreateScope();
+        var abpHostEnvironment = scope.ServiceProvider.GetRequiredService<IAbpHostEnvironment>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return abpHostEnvironment.IsDevelopment() && configuration.GetValue<bool?>("Abp:Telemetry:IsEnabled") != false;
+        }
+
+        return false;
+    }
+
+    //TODO: We can extract a new class for this
+    public virtual async Task ConfigureServicesAsync()
+    {
+        CheckMultipleConfigureServices();
+
+        var context = new ServiceConfigurationContext(Services);
+        Services.AddSingleton(context);
+
+        foreach (var module in Modules)
+        {
+            if (module.Instance is AbpModule abpModule)
+            {
+                abpModule.ServiceConfigurationContext = context;
             }
         }
 
-        public virtual void Dispose()
+        //PreConfigureServices
+        foreach (var module in Modules.Where(m => m.Instance is IPreConfigureServices))
         {
-            //TODO: Shutdown if not done before?
-        }
-
-        protected virtual void SetServiceProvider(IServiceProvider serviceProvider)
-        {
-            ServiceProvider = serviceProvider;
-            ServiceProvider.GetRequiredService<ObjectAccessor<IServiceProvider>>().Value = ServiceProvider;
-        }
-
-        protected virtual void InitializeModules()
-        {
-            using (var scope = ServiceProvider.CreateScope())
+            try
             {
-                WriteInitLogs(scope.ServiceProvider);
-                scope.ServiceProvider
-                    .GetRequiredService<IModuleManager>()
-                    .InitializeModules(new ApplicationInitializationContext(scope.ServiceProvider));
+                await ((IPreConfigureServices)module.Instance).PreConfigureServicesAsync(context);
+            }
+            catch (Exception ex)
+            {
+                throw new AbpInitializationException($"An error occurred during {nameof(IPreConfigureServices.PreConfigureServicesAsync)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
             }
         }
 
-        protected virtual void WriteInitLogs(IServiceProvider serviceProvider)
+        var assemblies = new HashSet<Assembly>();
+
+        //ConfigureServices
+        foreach (var module in Modules)
         {
-            var logger = serviceProvider.GetService<ILogger<AbpApplicationBase>>();
-            if (logger == null)
+            if (module.Instance is AbpModule abpModule)
             {
-                return;
-            }
-
-            var initLogger = serviceProvider.GetRequiredService<IInitLoggerFactory>().Create<AbpApplicationBase>();
-
-            foreach (var entry in initLogger.Entries)
-            {
-                logger.Log(entry.LogLevel, entry.EventId, entry.State, entry.Exception, entry.Formatter);
-            }
-
-            initLogger.Entries.Clear();
-        }
-
-        protected virtual IReadOnlyList<IAbpModuleDescriptor> LoadModules(IServiceCollection services, AbpApplicationCreationOptions options)
-        {
-            return services
-                .GetSingletonInstance<IModuleLoader>()
-                .LoadModules(
-                    services,
-                    StartupModuleType,
-                    options.PlugInSources
-                );
-        }
-
-        //TODO: We can extract a new class for this
-        protected virtual void ConfigureServices()
-        {
-            var context = new ServiceConfigurationContext(Services);
-            Services.AddSingleton(context);
-
-            foreach (var module in Modules)
-            {
-                if (module.Instance is AbpModule abpModule)
+                if (!abpModule.SkipAutoServiceRegistration)
                 {
-                    abpModule.ServiceConfigurationContext = context;
-                }
-            }
-
-            //PreConfigureServices
-            foreach (var module in Modules.Where(m => m.Instance is IPreConfigureServices))
-            {
-                try
-                {
-                    ((IPreConfigureServices)module.Instance).PreConfigureServices(context);
-                }
-                catch (Exception ex)
-                {
-                    throw new AbpInitializationException($"An error occurred during {nameof(IPreConfigureServices.PreConfigureServices)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
-                }
-            }
-
-            var assemblies = new HashSet<Assembly>();
-
-            //ConfigureServices
-            foreach (var module in Modules)
-            {
-                if (module.Instance is AbpModule abpModule)
-                {
-                    if (!abpModule.SkipAutoServiceRegistration)
+                    foreach (var assembly in module.AllAssemblies)
                     {
-                        var assembly = module.Type.Assembly;
                         if (!assemblies.Contains(assembly))
                         {
                             Services.AddAssembly(assembly);
@@ -154,37 +261,169 @@ namespace Volo.Abp
                         }
                     }
                 }
-
-                try
-                {
-                    module.Instance.ConfigureServices(context);
-                }
-                catch (Exception ex)
-                {
-                    throw new AbpInitializationException($"An error occurred during {nameof(IAbpModule.ConfigureServices)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
-                }
             }
 
-            //PostConfigureServices
-            foreach (var module in Modules.Where(m => m.Instance is IPostConfigureServices))
+            try
             {
-                try
+                await module.Instance.ConfigureServicesAsync(context);
+            }
+            catch (Exception ex)
+            {
+                throw new AbpInitializationException($"An error occurred during {nameof(IAbpModule.ConfigureServicesAsync)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
+            }
+        }
+
+        //PostConfigureServices
+        foreach (var module in Modules.Where(m => m.Instance is IPostConfigureServices))
+        {
+            try
+            {
+                await ((IPostConfigureServices)module.Instance).PostConfigureServicesAsync(context);
+            }
+            catch (Exception ex)
+            {
+                throw new AbpInitializationException($"An error occurred during {nameof(IPostConfigureServices.PostConfigureServicesAsync)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
+            }
+        }
+
+        foreach (var module in Modules)
+        {
+            if (module.Instance is AbpModule abpModule)
+            {
+                abpModule.ServiceConfigurationContext = null!;
+            }
+        }
+
+        _configuredServices = true;
+
+        TryToSetEnvironment(Services);
+    }
+
+    private void CheckMultipleConfigureServices()
+    {
+        if (_configuredServices)
+        {
+            throw new AbpInitializationException("Services have already been configured! If you call ConfigureServicesAsync method, you must have set AbpApplicationCreationOptions.SkipConfigureServices to true before.");
+        }
+    }
+
+    //TODO: We can extract a new class for this
+    public virtual void ConfigureServices()
+    {
+        CheckMultipleConfigureServices();
+
+        var context = new ServiceConfigurationContext(Services);
+        Services.AddSingleton(context);
+
+        foreach (var module in Modules)
+        {
+            if (module.Instance is AbpModule abpModule)
+            {
+                abpModule.ServiceConfigurationContext = context;
+            }
+        }
+
+        //PreConfigureServices
+        foreach (var module in Modules.Where(m => m.Instance is IPreConfigureServices))
+        {
+            try
+            {
+                ((IPreConfigureServices)module.Instance).PreConfigureServices(context);
+            }
+            catch (Exception ex)
+            {
+                throw new AbpInitializationException($"An error occurred during {nameof(IPreConfigureServices.PreConfigureServices)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
+            }
+        }
+
+        var assemblies = new HashSet<Assembly>();
+
+        //ConfigureServices
+        foreach (var module in Modules)
+        {
+            if (module.Instance is AbpModule abpModule)
+            {
+                if (!abpModule.SkipAutoServiceRegistration)
                 {
-                    ((IPostConfigureServices)module.Instance).PostConfigureServices(context);
-                }
-                catch (Exception ex)
-                {
-                    throw new AbpInitializationException($"An error occurred during {nameof(IPostConfigureServices.PostConfigureServices)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
+                    foreach (var assembly in module.AllAssemblies)
+                    {
+                        if (!assemblies.Contains(assembly))
+                        {
+                            Services.AddAssembly(assembly);
+                            assemblies.Add(assembly);
+                        }
+                    }
                 }
             }
 
-            foreach (var module in Modules)
+            try
             {
-                if (module.Instance is AbpModule abpModule)
-                {
-                    abpModule.ServiceConfigurationContext = null;
-                }
+                module.Instance.ConfigureServices(context);
             }
+            catch (Exception ex)
+            {
+                throw new AbpInitializationException($"An error occurred during {nameof(IAbpModule.ConfigureServices)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
+            }
+        }
+
+        //PostConfigureServices
+        foreach (var module in Modules.Where(m => m.Instance is IPostConfigureServices))
+        {
+            try
+            {
+                ((IPostConfigureServices)module.Instance).PostConfigureServices(context);
+            }
+            catch (Exception ex)
+            {
+                throw new AbpInitializationException($"An error occurred during {nameof(IPostConfigureServices.PostConfigureServices)} phase of the module {module.Type.AssemblyQualifiedName}. See the inner exception for details.", ex);
+            }
+        }
+
+        foreach (var module in Modules)
+        {
+            if (module.Instance is AbpModule abpModule)
+            {
+                abpModule.ServiceConfigurationContext = null!;
+            }
+        }
+
+        _configuredServices = true;
+
+        TryToSetEnvironment(Services);
+    }
+
+    private static string? GetApplicationName(AbpApplicationCreationOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(options.ApplicationName))
+        {
+            return options.ApplicationName!;
+        }
+
+        var configuration = options.Services.GetConfigurationOrNull();
+        if (configuration != null)
+        {
+            var appNameConfig = configuration["ApplicationName"];
+            if (!string.IsNullOrWhiteSpace(appNameConfig))
+            {
+                return appNameConfig!;
+            }
+        }
+
+        var entryAssembly = Assembly.GetEntryAssembly();
+        if (entryAssembly != null)
+        {
+            return entryAssembly.GetName().Name;
+        }
+
+        return null;
+    }
+
+    private static void TryToSetEnvironment(IServiceCollection services)
+    {
+        var abpHostEnvironment = services.GetSingletonInstance<IAbpHostEnvironment>();
+        if (abpHostEnvironment.EnvironmentName.IsNullOrWhiteSpace())
+        {
+            abpHostEnvironment.EnvironmentName = Environments.Production;
         }
     }
 }

@@ -1,43 +1,44 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Volo.Abp.Domain.Services;
+using Volo.Abp.EventBus.Local;
+using Volo.Abp.MultiTenancy;
 
-namespace Volo.Abp.TenantManagement
+namespace Volo.Abp.TenantManagement;
+
+public class TenantManager : DomainService, ITenantManager
 {
-    public class TenantManager : DomainService, ITenantManager
+    protected ITenantValidator TenantValidator { get; }
+    protected ITenantNormalizer TenantNormalizer { get; }
+    protected ILocalEventBus LocalEventBus { get; }
+
+    public TenantManager(
+        ITenantValidator tenantValidator,
+        ITenantNormalizer tenantNormalizer,
+        ILocalEventBus localEventBus)
     {
-        protected ITenantRepository TenantRepository { get; }
+        TenantValidator = tenantValidator;
+        TenantNormalizer = tenantNormalizer;
+        LocalEventBus = localEventBus;
+    }
 
-        public TenantManager(ITenantRepository tenantRepository)
-        {
-            TenantRepository = tenantRepository;
+    public virtual async Task<Tenant> CreateAsync(string name)
+    {
+        Check.NotNull(name, nameof(name));
 
-        }
+        var tenant = new Tenant(GuidGenerator.Create(), name, TenantNormalizer.NormalizeName(name));
+        await TenantValidator.ValidateAsync(tenant);
+        return tenant;
+    }
 
-        public virtual async Task<Tenant> CreateAsync(string name)
-        {
-            Check.NotNull(name, nameof(name));
+    public virtual async Task ChangeNameAsync(Tenant tenant, string name)
+    {
+        Check.NotNull(tenant, nameof(tenant));
+        Check.NotNull(name, nameof(name));
 
-            await ValidateNameAsync(name);
-            return new Tenant(GuidGenerator.Create(), name);
-        }
+        await LocalEventBus.PublishAsync(new TenantChangedEvent(tenant.Id, tenant.NormalizedName));
 
-        public virtual async Task ChangeNameAsync(Tenant tenant, string name)
-        {
-            Check.NotNull(tenant, nameof(tenant));
-            Check.NotNull(name, nameof(name));
-
-            await ValidateNameAsync(name, tenant.Id);
-            tenant.SetName(name);
-        }
-
-        protected virtual async Task ValidateNameAsync(string name, Guid? expectedId = null)
-        {
-            var tenant = await TenantRepository.FindByNameAsync(name);
-            if (tenant != null && tenant.Id != expectedId)
-            {
-                throw new UserFriendlyException("Duplicate tenancy name: " + name); //TODO: A domain exception would be better..?
-            }
-        }
+        tenant.SetName(name);
+        tenant.SetNormalizedName( TenantNormalizer.NormalizeName(name));
+        await TenantValidator.ValidateAsync(tenant);
     }
 }

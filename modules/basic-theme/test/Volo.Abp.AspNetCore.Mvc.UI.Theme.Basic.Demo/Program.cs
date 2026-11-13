@@ -1,47 +1,48 @@
 using System;
-using Microsoft.AspNetCore.Hosting;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Serilog.Events;
 
-namespace Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.Demo
+namespace Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.Demo;
+
+public class Program
 {
-    public class Program
+    public async static Task<int> Main(string[] args)
     {
-        public static int Main(string[] args)
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .Enrich.FromLogContext()
+            .WriteTo.Async(c => c.Console())
+            .CreateLogger();
+
+        try
         {
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .Enrich.FromLogContext()
-                .WriteTo.Async(c => c.File("Logs/logs.txt"))
-                .WriteTo.Async(c => c.Console())
-                .CreateLogger();
-
-            try
-            {
-                Log.Information("Starting web host.");
-                CreateHostBuilder(args).Build().Run();
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                Log.Fatal(ex, "Host terminated unexpectedly!");
-                return 1;
-            }
-            finally
-            {
-                Log.CloseAndFlush();
-            }
-        }
-
-
-        internal static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.UseStartup<Startup>();
-                })
+            Log.Information("Starting web host.");
+            var builder = WebApplication.CreateBuilder(args);
+            builder.Host.AddAppSettingsSecretsJson()
                 .UseAutofac()
                 .UseSerilog();
+            await builder.AddApplicationAsync<AbpAspNetCoreMvcUiThemeBasicDemoModule>();
+            var app = builder.Build();
+            await app.InitializeApplicationAsync();
+            await app.RunAsync();
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            if (ex is HostAbortedException)
+            {
+                throw;
+            }
+
+            Log.Fatal(ex, "Host terminated unexpectedly!");
+            return 1;
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
     }
 }

@@ -2,24 +2,21 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "sourceMap": true,
     "declaration": false,
-    "downlevelIteration": true,
     "experimentalDecorators": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "importHelpers": true,
-    "target": "es2017",
-    "module": "es2020",
-    "lib": [
-      "es2018",
-      "dom"
-    ],
+    "target": "ES2022",
+    "module": "ES2022",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
     "paths": {
-      "@proxy": ["src/app/proxy/index.ts"],
-      "@proxy/*": ["src/app/proxy/*"]
-    }
+      "@proxy": ["./src/app/proxy/index.ts"],
+      "@proxy/*": ["./src/app/proxy/*"]
+    },
+    "useDefineForClassFields": false
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false

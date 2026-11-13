@@ -1,7 +1,8 @@
-namespace Volo.Abp.Http.ProxyScripting
+using System.Threading.Tasks;
+
+namespace Volo.Abp.Http.ProxyScripting;
+
+public interface IProxyScriptManager
 {
-    public interface IProxyScriptManager
-    {
-        string GetScript(ProxyScriptingModel scriptingModel);
-    }
+    Task<string> GetScriptAsync(ProxyScriptingModel scriptingModel);
 }

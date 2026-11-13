@@ -1,6 +1,6 @@
-import { LocalizationService } from '@abp/ng.core';
+import { escapeHtmlChars, LocalizationService } from '@abp/ng.core';
 import { IdentityRoleDto } from '@abp/ng.identity/proxy';
-import { EntityProp, ePropType } from '@abp/ng.theme.shared/extensions';
+import { EntityProp, ePropType } from '@abp/ng.components/extensible';
 import { of } from 'rxjs';
 
 export const DEFAULT_ROLES_ENTITY_PROPS = EntityProp.createMany<IdentityRoleDto>([
@@ -15,7 +15,7 @@ export const DEFAULT_ROLES_ENTITY_PROPS = EntityProp.createMany<IdentityRoleDto>
       const { isDefault, isPublic, name } = data.record;
 
       return of(
-        name +
+        escapeHtmlChars(name) +
           (isDefault
             ? `<span class="badge rounded-pill bg-success ms-1">${t(
                 'AbpIdentity::DisplayName:IsDefault',

@@ -1,41 +1,33 @@
-import { CoreModule, LazyModuleFactory } from '@abp/ng.core';
-import { ThemeSharedModule } from '@abp/ng.theme.shared';
+import { LazyModuleFactory } from '@abp/ng.core';
 import { ModuleWithProviders, NgModule, NgModuleFactory } from '@angular/core';
-import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
-import { NgxValidateCoreModule } from '@ngx-validate/core';
-import { AccountRoutingModule } from './account-routing.module';
-import { ChangePasswordComponent } from './components/change-password/change-password.component';
-import { LoginComponent } from './components/login/login.component';
-import { ManageProfileComponent } from './components/manage-profile/manage-profile.component';
-import { PersonalSettingsComponent } from './components/personal-settings/personal-settings.component';
-import { RegisterComponent } from './components/register/register.component';
 import { AccountConfigOptions } from './models/config-options';
 import { ACCOUNT_CONFIG_OPTIONS } from './tokens/config-options.token';
 import { accountConfigOptionsFactory } from './utils/factory-utils';
 import { AuthenticationFlowGuard } from './guards/authentication-flow.guard';
-import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
-import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
+import { RE_LOGIN_CONFIRMATION_TOKEN } from './tokens';
 
-const declarations = [
-  LoginComponent,
-  RegisterComponent,
-  ChangePasswordComponent,
-  ManageProfileComponent,
-  PersonalSettingsComponent,
+import { ACCOUNT_EDIT_FORM_PROP_CONTRIBUTORS } from './tokens/extensions.token';
+import { AccountExtensionsGuard } from './guards/extensions.guard';
+import {
   ForgotPasswordComponent,
+  LoginComponent,
+  ManageProfileComponent,
+  RegisterComponent,
   ResetPasswordComponent,
-];
+} from './components';
+import { AccountRoutingModule } from './account-routing.module';
 
 @NgModule({
-  declarations: [...declarations],
+  declarations: [],
   imports: [
-    CoreModule,
+    LoginComponent,
+    RegisterComponent,
+    ForgotPasswordComponent,
+    ResetPasswordComponent,
+    ManageProfileComponent,
     AccountRoutingModule,
-    ThemeSharedModule,
-    NgbDropdownModule,
-    NgxValidateCoreModule,
   ],
-  exports: [...declarations],
+  exports: [],
 })
 export class AccountModule {
   static forChild(options = {} as AccountConfigOptions): ModuleWithProviders<AccountModule> {
@@ -49,10 +41,21 @@ export class AccountModule {
           useFactory: accountConfigOptionsFactory,
           deps: [ACCOUNT_CONFIG_OPTIONS],
         },
+        {
+          provide: RE_LOGIN_CONFIRMATION_TOKEN,
+          useValue: options.isPersonalSettingsChangedConfirmationActive ?? true,
+        },
+        {
+          provide: ACCOUNT_EDIT_FORM_PROP_CONTRIBUTORS,
+          useValue: options.editFormPropContributors,
+        },
+        AccountExtensionsGuard,
       ],
     };
   }
-
+  /**
+   * @deprecated `AccountModule.forLazy()` is deprecated. You can use `createRoutes` **function** instead.
+   */
   static forLazy(options = {} as AccountConfigOptions): NgModuleFactory<AccountModule> {
     return new LazyModuleFactory(AccountModule.forChild(options));
   }

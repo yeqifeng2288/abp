@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { map } from 'rxjs/operators';
 import { ABP } from '../models/common';
 import { ApplicationConfigurationDto } from '../proxy/volo/abp/asp-net-core/mvc/application-configurations/models';
@@ -6,7 +6,8 @@ import { ConfigStateService } from './config-state.service';
 
 @Injectable({ providedIn: 'root' })
 export class PermissionService {
-  constructor(protected configState: ConfigStateService) {}
+  protected configState = inject(ConfigStateService);
+
 
   getGrantedPolicy$(key: string) {
     return this.getStream().pipe(
@@ -14,7 +15,7 @@ export class PermissionService {
     );
   }
 
-  getGrantedPolicy(key: string) {
+  getGrantedPolicy(key: string | undefined) {
     const policies = this.getSnapshot();
     return this.isPolicyGranted(key, policies);
   }
@@ -36,7 +37,7 @@ export class PermissionService {
     );
   }
 
-  protected isPolicyGranted(key: string, grantedPolicies: Record<string, boolean>) {
+  protected isPolicyGranted(key: string | undefined, grantedPolicies: Record<string, boolean>) {
     if (!key) return true;
 
     const orRegexp = /\|\|/g;

@@ -1,0 +1,9 @@
+<Project>
+  <!-- Since 11.0.100 RC 2, a Debug build of a Web SDK project fails when it references a Web SDK project that
+       contributes the build-only hot reload JS initializer. The condition covers the 11.0.1xx SDKs; check
+       the regression again before moving to an 11.0.2xx SDK.
+       Remove this file once the repository targets an SDK that no longer has this regression. -->
+  <PropertyGroup Condition="$(NETCoreSdkVersion.StartsWith('11.0.1')) and '$(UsingMicrosoftNETSdkWeb)' == 'true' and ('$(OutputType)' == 'Library' or $(MSBuildProjectFullPath.Contains('test')))">
+    <EnableHotReloadInRuntimeConfigDevFile>false</EnableHotReloadInRuntimeConfigDevFile>
+  </PropertyGroup>
+</Project>

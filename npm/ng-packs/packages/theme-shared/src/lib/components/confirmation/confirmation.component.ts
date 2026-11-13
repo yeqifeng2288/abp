@@ -1,18 +1,26 @@
-import { Component } from '@angular/core';
+import { AsyncPipe } from '@angular/common';
+import {Component, inject, ChangeDetectionStrategy,} from '@angular/core';
 import { ReplaySubject } from 'rxjs';
 import { Confirmation } from '../../models/confirmation';
+import { CONFIRMATION_ICONS, ConfirmationIcons } from '../../tokens/confirmation-icons.token';
+import { LocalizationPipe } from '@abp/ng.core';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'abp-confirmation',
   templateUrl: './confirmation.component.html',
   styleUrls: ['./confirmation.component.scss'],
+  imports: [AsyncPipe, LocalizationPipe],
 })
 export class ConfirmationComponent {
+  private icons = inject<ConfirmationIcons>(CONFIRMATION_ICONS);
+
+
   confirm = Confirmation.Status.confirm;
   reject = Confirmation.Status.reject;
   dismiss = Confirmation.Status.dismiss;
 
-  confirmation$!: ReplaySubject<Confirmation.DialogData>;
+  confirmation$!: ReplaySubject<Confirmation.DialogData | null>;
 
   clear!: (status: Confirmation.Status) => void;
 
@@ -20,18 +28,24 @@ export class ConfirmationComponent {
     this.clear(status);
   }
 
-  getIconClass({ severity }: Confirmation.DialogData): string {
-    switch (severity) {
-      case 'info':
-        return 'fa-info-circle';
-      case 'success':
-        return 'fa-check-circle';
-      case 'warning':
-        return 'fa-exclamation-triangle';
-      case 'error':
-        return 'fa-times-circle';
-      default:
-        return 'fa-question-circle';
+  getIconClass({ severity, options }: Confirmation.DialogData): string {
+    if (options && options.icon) {
+      return options.icon;
     }
+    if (!this.icons) {
+      return '';
+    }
+    if (severity) {
+      return this.icons[severity];
+    }
+    return this.icons.default;
+  }
+
+  isCustomIconExists({ options }: Confirmation.DialogData): boolean {
+    return !!(options && (options.iconTemplate || options.icon));
+  }
+
+  isIconTemplateExits({ options }: Confirmation.DialogData): boolean {
+    return !!(options && options.iconTemplate);
   }
 }

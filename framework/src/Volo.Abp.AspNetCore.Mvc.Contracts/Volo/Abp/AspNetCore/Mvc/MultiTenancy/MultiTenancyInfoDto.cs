@@ -1,11 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Volo.Abp.MultiTenancy;
 
-namespace Volo.Abp.AspNetCore.Mvc.MultiTenancy
+namespace Volo.Abp.AspNetCore.Mvc.MultiTenancy;
+
+public class MultiTenancyInfoDto
 {
-    public class MultiTenancyInfoDto
-    {
-        public bool IsEnabled { get; set; }
-    }
+    public bool IsEnabled { get; set; }
+
+    public TenantUserSharingStrategy UserSharingStrategy { get; set; }
 }

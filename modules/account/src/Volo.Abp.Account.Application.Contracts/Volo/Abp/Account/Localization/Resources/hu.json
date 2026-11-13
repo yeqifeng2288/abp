@@ -1,6 +1,7 @@
 {
   "culture": "hu",
   "texts": {
+    "Menu:Account": "Fiók",
     "UserName": "Felhasználónév",
     "EmailAddress": "Email cím",
     "UserNameOrEmailAddress": "Felhasználónév és email cím",
@@ -10,6 +11,8 @@
     "UserLockedOutMessage": "A felhasználói fiókot érvénytelen bejelentkezési kísérletek miatt zároltuk. Kérjük, várjon egy kicsit, és próbálja újra.",
     "InvalidUserNameOrPassword": "Érvénytelen felhasználónév vagy jelszó!",
     "LoginIsNotAllowed": "A bejelentkezés nem engedélyezett! Fiókja inaktív, vagy meg kell erősítenie e -mail címét/telefonszámát.",
+    "ExternalLoginPasswordChangeRequired": "A bejelentkezés nem engedélyezett! A jelszavát meg kell változtatni, de ez külső bejelentkezéssel nem lehetséges. Kérjük, forduljon a rendszergazdához.",
+    "RegisteredButLoginIsNotAllowed": "A fiókja létrejött, de a bejelentkezés még nem engedélyezett!",
     "SelfRegistrationDisabledMessage": "Ennél az alkalmazásnál az önregisztráció le van tiltva. Új felhasználó regisztrálásához vegye fel a kapcsolatot az alkalmazás rendszergazdájával.",
     "LocalLoginDisabledMessage": "A helyi bejelentkezés le van tiltva ennél az alkalmazásnál.",
     "Login": "Bejelntkezés",
@@ -33,8 +36,11 @@
     "DisplayName:PhoneNumber": "Telefonszám",
     "PersonalSettings": "Személyes beállítások",
     "PersonalSettingsSaved": "Személyes beállítások mentve",
+    "PersonalSettingsChangedConfirmationModalTitle": "Személyes adatok megváltoztak",
+    "PersonalSettingsChangedConfirmationModalDescription": "Ha alkalmazni szeretné ezeket a változtatásokat, be kell jelentkeznie. Ki akar jelentkezni?",
     "PasswordChanged": "Jelszó megváltoztatva",
     "NewPasswordConfirmFailed": "Kérjük, erősítse meg az új jelszót.",
+    "NewPasswordSameAsOld": "Az új jelszó nem lehet azonos a régi jelszóval.",
     "Manage": "Kezelés",
     "MyAccount": "A fiókom",
     "DisplayName:Abp.Account.IsSelfRegistrationEnabled": "Engedélyezve van az önregisztráció",
@@ -49,7 +55,7 @@
     "SendPasswordResetLink_Information": "Jelszó-visszaállítási linket küldünk az e-mailre a jelszó visszaállításához. Ha néhány percen belül nem kap e-mailt, próbálkozzon újra.",
     "PasswordResetMailSentMessage": "A fiók-helyreállítási e-mailt az Ön e-mail címére küldtük. Ha 15 percen belül nem látja ezt az e-mailt a beérkező levelek között, keresse meg a levélszemét mappájában. Ha ott találja, kérjük, jelölje meg: -Nem szemét-.",
     "ResetPassword": "Jelszó visszaállítása",
-    "ConfirmPassword": "Erősítse meg (ismételje meg) a jelszót",
+    "ConfirmPassword": "Erősítse meg a jelszót",
     "ResetPassword_Information": "Kérjük, írja be új jelszavát.",
     "YourPasswordIsSuccessfullyReset": "Jelszavát sikeresen visszaállította.",
     "GoToTheApplication": "Lépjen az alkalmazáshoz",
@@ -62,6 +68,10 @@
     "PasswordResetInfoInEmail": "Fiók-helyreállítási kérelmet kaptunk! Ha Ön kezdeményezte ezt a kérést, kattintson a következő hivatkozásra jelszava visszaállításához.",
     "ResetMyPassword": "Jelszavam visszaállítása",
     "AccessDenied": "Hozzáférés megtagadva!",
-    "AccessDeniedMessage": "Nincs hozzáférése ehhez az erőforráshoz."
+    "AccessDeniedMessage": "Nincs hozzáférése ehhez az erőforráshoz.",
+    "OrRegisterWith": "Vagy regisztráljon:",
+    "RegisterUsingYourProviderAccount": "Regisztráljon a(z) {0} fiókjával",
+    "RequireMigrateSeedTitle": "Nem található az adminisztrátor felhasználó",
+    "RequireMigrateSeedMessage": "Kérjük, győződjön meg arról, hogy az adatbázis seed végrehajtásra került. Tekintse meg a <a target=\"_blank\" href=\"https://abp.io/kb/0003\">dokumentációt</a> a lehetséges megoldásokért."
   }
 }

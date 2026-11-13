@@ -1,43 +1,78 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Volo.Abp.Content;
 
-namespace Volo.Abp.Http.DynamicProxying
+namespace Volo.Abp.Http.DynamicProxying;
+
+public interface IRegularTestController
 {
-    public interface IRegularTestController
-    {
-        Task<int> IncrementValueAsync(int value);
+    Task<int> IncrementValueAsync(int value);
 
-        Task GetException1Async();
+    Task<string> GetPlainStringAsync();
 
-        Task GetException2Async();
+    Task<string> GetProducesJsonStringAsync();
 
-        Task<DateTime> GetWithDateTimeParameterAsync(DateTime dateTime1);
+    Task<string> GetProducesTextStringAsync();
 
-        Task<string> PostValueWithHeaderAndQueryStringAsync(string headerValue, string qsValue);
+    Task<string> GetNullStringAsync();
 
-        Task<string> PostValueWithBodyAsync(string bodyValue);
+    Task<string> GetProducesJsonNullStringAsync();
 
-        Task<Car> PostObjectWithBodyAsync(Car bodyValue);
+    Task<string> GetEmptyStringAsync();
 
-        Task<Car> PostObjectWithQueryAsync(Car bodyValue);
+    Task<string> GetEscapedStringAsync();
 
-        Task<Car> GetObjectWithUrlAsync(Car bodyValue);
+    Task<IRemoteStreamContent> DownloadIconAsync();
 
-        Task<Car> GetObjectandIdAsync(int id, Car bodyValue);
+    Task<object> GetReferenceTypeObjectAsync();
 
-        Task<Car> GetObjectAndIdWithQueryAsync(int id, Car bodyValue);
+    Task<byte[]> GetByteArrayAsync();
 
-        Task<string> PutValueWithBodyAsync(string bodyValue);
+    Task GetException1Async();
 
-        Task<string> PatchValueWithBodyAsync(string bodyValue);
+    Task GetException2Async();
 
-        Task<string> PutValueWithHeaderAndQueryStringAsync(string headerValue, string qsValue);
+    Task<DateTime> GetWithDateTimeParameterAsync(DateTime dateTime1);
 
-        Task<string> PatchValueWithHeaderAndQueryStringAsync(string headerValue, string qsValue);
+    Task<string> PostValueWithHeaderAndQueryStringAsync(string headerValue, string qsValue);
 
-        Task<int> DeleteByIdAsync(int id);
+    Task<string> PostValueWithBodyAsync(string bodyValue);
 
-        Task<string> AbortRequestAsync(CancellationToken cancellationToken = default);
-    }
+    Task<Car> PostObjectWithBodyAsync(Car bodyValue);
+
+    Task<Car> PostObjectWithQueryAsync(Car bodyValue);
+
+    Task<Car> QueryObjectWithBodyAsync(Car bodyValue);
+
+    Task<Car> GetObjectWithUrlAsync(Car bodyValue);
+
+    Task<Car> GetObjectandIdAsync(int id, Car bodyValue);
+
+    Task<Car> GetObjectandFirstReleaseDateAsync(DateTime time, Car bodyValue);
+
+    Task<Car> GetObjectandCountAsync(int count, Car bodyValue);
+
+    Task<Car> GetObjectAndIdWithQueryAsync(int id, Car bodyValue);
+
+    Task<string> GetWithStringPathAsync(string name);
+
+    Task<string> GetWithCatchAllPathAsync(string path);
+
+    Task<string> GetWithSingleStarCatchAllPathAsync(string path);
+
+    Task<string> PutValueWithBodyAsync(string bodyValue);
+
+    Task<string> PatchValueWithBodyAsync(string bodyValue);
+
+    Task<string> PutValueWithHeaderAndQueryStringAsync(string headerValue, string qsValue);
+
+    Task<string> PatchValueWithHeaderAndQueryStringAsync(string headerValue, string qsValue);
+
+    Task<int> DeleteByIdAsync(int id);
+
+    Task<string> AbortRequestAsync(CancellationToken cancellationToken = default);
+
+    Task<string> TimeOutRequestAsync();
+
 }

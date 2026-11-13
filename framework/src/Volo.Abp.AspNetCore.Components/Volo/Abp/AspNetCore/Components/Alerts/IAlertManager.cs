@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace Volo.Abp.AspNetCore.Components.Alerts;
 
-namespace Volo.Abp.AspNetCore.Components.Alerts
+public interface IAlertManager
 {
-    public interface IAlertManager
-    {
-        AlertList Alerts { get; }
-    }
+    AlertList Alerts { get; }
 }

@@ -1,14 +1,14 @@
-using System;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Volo.Abp.AspNetCore.Mvc.Localization;
 using Volo.Abp.AspNetCore.Mvc.UI.Bootstrap;
 using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
+using Volo.Abp.Ui.LayoutHooks;
 using Volo.Abp.AspNetCore.Mvc.UI.Packages;
 using Volo.Abp.AspNetCore.Mvc.UI.Packages.Prismjs;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared;
-using Volo.Abp.AutoMapper;
+using Volo.Abp.Mapperly;
 using Volo.Abp.Http.ProxyScripting.Generators.JQuery;
 using Volo.Abp.Modularity;
 using Volo.Abp.VirtualFileSystem;
@@ -16,12 +16,13 @@ using Volo.Docs.Bundling;
 using Volo.Docs.HtmlConverting;
 using Volo.Docs.Localization;
 using Volo.Docs.Markdown;
+using Volo.Docs.Pages.Shared.Components.Head;
 
 namespace Volo.Docs
 {
     [DependsOn(
         typeof(DocsApplicationContractsModule),
-        typeof(AbpAutoMapperModule),
+        typeof(AbpMapperlyModule),
         typeof(AbpAspNetCoreMvcUiBootstrapModule),
         typeof(AbpAspNetCoreMvcUiThemeSharedModule),
         typeof(AbpAspNetCoreMvcUiPackagesModule),
@@ -33,7 +34,11 @@ namespace Volo.Docs
         {
             PreConfigure<AbpMvcDataAnnotationsLocalizationOptions>(options =>
             {
-                options.AddAssemblyResource(typeof(DocsResource), typeof(DocsWebModule).Assembly);
+                options.AddAssemblyResource(
+                    typeof(DocsResource), 
+                    typeof(DocsWebModule).Assembly, 
+                    typeof(DocsApplicationContractsModule).Assembly
+                );
             });
 
             PreConfigure<IMvcBuilder>(mvcBuilder =>
@@ -44,6 +49,8 @@ namespace Volo.Docs
 
         public override void ConfigureServices(ServiceConfigurationContext context)
         {
+            context.Services.AddMapperlyObjectMapper<DocsWebModule>();
+            
             Configure<AbpVirtualFileSystemOptions>(options =>
             {
                 options.FileSets.AddEmbedded<DocsWebModule>();
@@ -58,17 +65,32 @@ namespace Volo.Docs
                     .Value.Value;
 
                 var routePrefix = docsOptions.RoutePrefix;
+                
+                var languageCode = docsOptions.MultiLanguageMode ? "{languageCode}/" : string.Empty;
 
-                options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + "{projectName}");
-                options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + "{languageCode}/{projectName}");
-                options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + "{languageCode}/{projectName}/{version}/{*documentName}");
-                options.Conventions.AddPageRoute("/Documents/Search", routePrefix + "search/{languageCode}/{projectName}/{version}");
-            });
-
-            context.Services.AddAutoMapperObjectMapper<DocsWebModule>();
-            Configure<AbpAutoMapperOptions>(options =>
-            {
-                options.AddProfile<DocsWebAutoMapperProfile>(validate: true);
+                if (docsOptions.SingleProjectMode.Enable)
+                {
+                    if (routePrefix != "/")
+                    {
+                        options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix);
+                    }
+                    if(routePrefix + languageCode != "/")
+                    {
+                        options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + languageCode);
+                    }
+                    options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + languageCode + "{version}/{*documentName}");
+                    options.Conventions.AddPageRoute("/Documents/Search", routePrefix + "search/" + languageCode + "{version}");
+                }
+                else
+                {
+                    if(routePrefix + languageCode != "/")
+                    {
+                        options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + "{projectName}");
+                    }
+                    options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + languageCode +  "{projectName}");
+                    options.Conventions.AddPageRoute("/Documents/Project/Index", routePrefix + languageCode + "{projectName}/{version}/{*documentName}");
+                    options.Conventions.AddPageRoute("/Documents/Search", routePrefix + "search/" + languageCode + "{projectName}/{version}");
+                }
             });
 
             Configure<DocumentToHtmlConverterOptions>(options =>
@@ -90,6 +112,11 @@ namespace Volo.Docs
             Configure<DynamicJavaScriptProxyOptions>(options =>
             {
                 options.DisableModule(DocsRemoteServiceConsts.ModuleName);
+            });
+
+            Configure<AbpLayoutHookOptions>(options =>
+            {
+                options.Add(LayoutHooks.Head.Last, typeof(HeadViewComponent));
             });
         }
     }

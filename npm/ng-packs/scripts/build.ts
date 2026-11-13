@@ -4,7 +4,6 @@ import fse from 'fs-extra';
 
 (async () => {
   program.option('-i, --noInstall', 'skip updating package.json and installation', false);
-  program.option('-c, --skipNgcc', 'skip ngcc', false);
 
   program.parse(process.argv);
 
@@ -25,6 +24,9 @@ import fse from 'fs-extra';
         '--prod',
         '--projects',
         'core,theme-shared,components',
+        '--parallel',
+        '1',
+        '--skip-nx-cache',
       ],
       { stdout: 'inherit', cwd: '../' },
     );
@@ -40,6 +42,8 @@ import fse from 'fs-extra';
         '--projects',
         'feature-management,permission-management,account-core',
         '--parallel',
+        '1',
+        '--skip-nx-cache',
       ],
       { stdout: 'inherit', cwd: '../' },
     );
@@ -56,11 +60,11 @@ import fse from 'fs-extra';
         '--exclude',
         'dev-app,schematics,core,theme-shared,components,feature-management,permission-management,account-core',
         '--parallel',
+        '1',
+        '--skip-nx-cache',
       ],
       { stdout: 'inherit', cwd: '../' },
     );
-
-    if (!program.skipNgcc) await execa('yarn', ['compile:ivy'], { stdout: 'inherit', cwd: '../' });
   } catch (error) {
     console.error(error.stderr);
     process.exit(1);

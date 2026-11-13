@@ -1,21 +1,27 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Localization;
 
-namespace Volo.Abp.AspNetCore.Mvc.Localization
+namespace Volo.Abp.AspNetCore.Mvc.Localization;
+
+public class QueryStringCultureReplacementContext
 {
-    public class QueryStringCultureReplacementContext
+    public HttpContext HttpContext { get; }
+
+    public RequestCulture RequestCulture { get; }
+
+    public string ReturnUrl { get; set; }
+
+    public string? CurrentCulture { get; }
+
+    public QueryStringCultureReplacementContext(
+        HttpContext httpContext,
+        RequestCulture requestCulture,
+        string returnUrl,
+        string? currentCulture = null)
     {
-        public HttpContext HttpContext { get; }
-
-        public RequestCulture RequestCulture { get; }
-
-        public string ReturnUrl { get; set; }
-
-        public QueryStringCultureReplacementContext(HttpContext httpContext, RequestCulture requestCulture, string returnUrl)
-        {
-            HttpContext = httpContext;
-            RequestCulture = requestCulture;
-            ReturnUrl = returnUrl;
-        }
+        HttpContext = httpContext;
+        RequestCulture = requestCulture;
+        ReturnUrl = returnUrl;
+        CurrentCulture = currentCulture;
     }
 }

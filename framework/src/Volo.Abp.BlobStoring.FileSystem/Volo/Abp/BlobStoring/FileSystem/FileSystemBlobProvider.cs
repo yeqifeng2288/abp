@@ -1,87 +1,121 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using Polly;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.IO;
+using Volo.Abp.Threading;
 
-namespace Volo.Abp.BlobStoring.FileSystem
+namespace Volo.Abp.BlobStoring.FileSystem;
+
+public class FileSystemBlobProvider : BlobProviderBase, ITransientDependency
 {
-    public class FileSystemBlobProvider : BlobProviderBase, ITransientDependency
+    protected IBlobFilePathCalculator FilePathCalculator { get; }
+
+    public FileSystemBlobProvider(IBlobFilePathCalculator filePathCalculator)
     {
-        protected IBlobFilePathCalculator FilePathCalculator { get; }
+        FilePathCalculator = filePathCalculator;
+    }
 
-        public FileSystemBlobProvider(IBlobFilePathCalculator filePathCalculator)
+    public override async Task SaveAsync(BlobProviderSaveArgs args)
+    {
+        var filePath = FilePathCalculator.Calculate(args);
+
+        if (!args.OverrideExisting && await ExistsAsync(filePath))
         {
-            FilePathCalculator = filePathCalculator;
+            throw new BlobAlreadyExistsException($"Saving BLOB '{args.BlobName}' does already exists in the container '{args.ContainerName}'! Set {nameof(args.OverrideExisting)} if it should be overwritten.");
         }
 
-        public override async Task SaveAsync(BlobProviderSaveArgs args)
-        {
-            var filePath = FilePathCalculator.Calculate(args);
+        DirectoryHelper.CreateIfNotExists(Path.GetDirectoryName(filePath)!);
 
-            if (!args.OverrideExisting && await ExistsAsync(filePath))
+        var fileMode = args.OverrideExisting
+            ? FileMode.Create
+            : FileMode.CreateNew;
+
+        // A failure is only retried while it is replayable: before OpenFileStream returns
+        // (the source is untouched), or for a seekable overwrite (the source can seek back
+        // and FileMode.Create truncates the partial content). Otherwise a retry would
+        // replay a half-consumed source or hit the file a failed CreateNew attempt left behind.
+        long sourcePosition;
+        try
+        {
+            sourcePosition = args.BlobStream.CanSeek && fileMode == FileMode.Create ? args.BlobStream.Position : -1;
+        }
+        catch (Exception ex) when (ex is NotSupportedException || ex is IOException)
+        {
+            // A failing position probe degrades to a single, non-replayable attempt
+            sourcePosition = -1;
+        }
+
+        var targetOpened = false;
+
+        await RetryHelper.ExecuteAsync(
+            async _ =>
             {
-                throw new BlobAlreadyExistsException($"Saving BLOB '{args.BlobName}' does already exists in the container '{args.ContainerName}'! Set {nameof(args.OverrideExisting)} if it should be overwritten.");
-            }
-
-            DirectoryHelper.CreateIfNotExists(Path.GetDirectoryName(filePath));
-
-            var fileMode = args.OverrideExisting
-                ? FileMode.Create
-                : FileMode.CreateNew;
-
-            await Policy.Handle<IOException>()
-                .WaitAndRetryAsync(2, retryCount => TimeSpan.FromSeconds(retryCount))
-                .ExecuteAsync(async () =>
+                if (sourcePosition >= 0)
                 {
-                    using (var fileStream = File.Open(filePath, fileMode, FileAccess.Write))
-                    {
-                        await args.BlobStream.CopyToAsync(
-                            fileStream,
-                            args.CancellationToken
-                        );
+                    args.BlobStream.Seek(sourcePosition, SeekOrigin.Begin);
+                }
 
-                        await fileStream.FlushAsync();
-                    }
-                });
-        }
+                using (var fileStream = OpenFileStream(filePath, fileMode))
+                {
+                    targetOpened = true;
 
-        public override Task<bool> DeleteAsync(BlobProviderDeleteArgs args)
-        {
-            var filePath = FilePathCalculator.Calculate(args);
-            return Task.FromResult(FileHelper.DeleteIfExists(filePath));
-        }
+                    await args.BlobStream.CopyToAsync(
+                        fileStream,
+                        args.CancellationToken
+                    );
 
-        public override Task<bool> ExistsAsync(BlobProviderExistsArgs args)
-        {
-            var filePath = FilePathCalculator.Calculate(args);
-            return ExistsAsync(filePath);
-        }
-
-        public override async Task<Stream> GetOrNullAsync(BlobProviderGetArgs args)
-        {
-            var filePath = FilePathCalculator.Calculate(args);
-
-            if (!File.Exists(filePath))
+                    await fileStream.FlushAsync();
+                }
+            },
+            new RetryOptions
             {
-                return null;
-            }
+                MaxRetryCount = 2,
+                DelayFactory = retryCount => TimeSpan.FromSeconds(retryCount),
+                ShouldRetryOnException = ex => ex is IOException && (sourcePosition >= 0 || !targetOpened)
+            },
+            args.CancellationToken);
+    }
 
-            return await Policy.Handle<IOException>()
-                .WaitAndRetryAsync(2, retryCount => TimeSpan.FromSeconds(retryCount))
-                .ExecuteAsync(async () =>
-                {
-                    using (var fileStream = File.OpenRead(filePath))
-                    {
-                        return await TryCopyToMemoryStreamAsync(fileStream, args.CancellationToken);
-                    }
-                });
-        }
+    public override Task<bool> DeleteAsync(BlobProviderDeleteArgs args)
+    {
+        var filePath = FilePathCalculator.Calculate(args);
+        return Task.FromResult(FileHelper.DeleteIfExists(filePath));
+    }
 
-        protected virtual Task<bool> ExistsAsync(string filePath)
+    public override Task<bool> ExistsAsync(BlobProviderExistsArgs args)
+    {
+        var filePath = FilePathCalculator.Calculate(args);
+        return ExistsAsync(filePath);
+    }
+
+    public override async Task<Stream?> GetOrNullAsync(BlobProviderGetArgs args)
+    {
+        var filePath = FilePathCalculator.Calculate(args);
+
+        if (!File.Exists(filePath))
         {
-            return Task.FromResult(File.Exists(filePath));
+            return null;
         }
+
+        return await RetryHelper.ExecuteAsync(
+            _ => Task.FromResult(File.OpenRead(filePath)),
+            new RetryOptions<FileStream>
+            {
+                MaxRetryCount = 2,
+                DelayFactory = retryCount => TimeSpan.FromSeconds(retryCount),
+                ShouldRetryOnException = ex => ex is IOException
+            },
+            args.CancellationToken);
+    }
+
+    protected virtual Stream OpenFileStream(string filePath, FileMode fileMode)
+    {
+        return File.Open(filePath, fileMode, FileAccess.Write);
+    }
+
+    protected virtual Task<bool> ExistsAsync(string filePath)
+    {
+        return Task.FromResult(File.Exists(filePath));
     }
 }

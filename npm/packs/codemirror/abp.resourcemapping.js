@@ -1,5 +1,6 @@
 module.exports = {
     mappings: {
-        "@node_modules/codemirror/lib/*.*": "@libs/codemirror/"
+        "@node_modules/@abp/codemirror/src/*.*": "@libs/codemirror/",
+        "@node_modules/@abp/codemirror/src/mode/**/*.*": "@libs/codemirror/mode/"
     }
 }

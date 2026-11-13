@@ -1,10 +1,18 @@
 # Using Elsa Workflow with ABP Framework
 
+> **UPDATE:** There is a newer version of this article, which covers Elsa 3 with ABP Framework. You can check it at https://abp.io/community/articles/using-elsa-3-workflow-with-abp-framework-usqk8afg
+
 **Elsa Core** is an open-source workflows library that can be used in any kind of .NET Core application. Using such a workflow library can be useful to implement business rules visually or programmatically.
 
 ![elsa-overview](./elsa-overview.gif)
 
 This article shows how we can use this workflow library within our ABP-based application. We will start with a couple of examples and then we will integrate the **Elsa Dashboard** (you can see it in the above gif) into our application to be able to design our workflows visually.
+
+---
+> 🛠 Liked this post? I now share all my content on Substack — real-world .NET, AI, and scalable software design.
+> 👉 Subscribe here → engincanveske.substack.com
+> 🎥 Also, check out my YouTube channel for hands-on demos and deep dives: https://www.youtube.com/@engincanv
+---
 
 ## Source Code
 
@@ -241,8 +249,9 @@ private void ConfigureElsa(ServiceConfigurationContext context, IConfiguration c
         .WithExposedHeaders("Content-Disposition"))
     );
     
-    //register controllers inside elsa
-    context.Services.AddAssemblyOf<Elsa.Server.Api.Endpoints.WorkflowRegistry.Get>();
+    //Uncomment the below line if your abp version is lower than v4.4 to register controllers of Elsa .
+    //See https://github.com/abpframework/abp/pull/9299 (we will no longer need to specify this line of code from v4.4)
+    // context.Services.AddAssemblyOf<Elsa.Server.Api.Endpoints.WorkflowRegistry.Get>();
     
     //Disable antiforgery validation for elsa
     Configure<AbpAntiForgeryOptions>(options =>
@@ -269,11 +278,7 @@ public override void OnApplicationInitialization(ApplicationInitializationContex
 }
 ```
 
-* In here we've specified the Elsa Server Api's assembly by using the `AddAssemblyOf<>` extension method to register the required services (controllers). These services required for the dashboard (if we create a workflow by using **Elsa Workflow Designer** it calls some services under the hook, therefore we need to be assured about these services get registered).
-
-* With [v4.4](https://github.com/abpframework/abp/pull/9299), we will no longer need to specify this line of code.
-
-> **Note:** `AddAssemblyOf<>` extension method can help you to register all your services by convention. You can check [here](https://docs.abp.io/en/abp/latest/Dependency-Injection#conventional-registration) for more information about conventional registration.
+* These services required for the dashboard.
 
 * We don't need to register our workflows one by one anymore. Because now we use `.AddWorkflowsFrom<Startup>()`, and this registers workflows on our behalf. 
 
@@ -371,12 +376,14 @@ namespace ElsaDemo.Permissions
     <link rel="icon" type="image/png" sizes="32x32" href="/_content/Elsa.Designer.Components.Web/elsa-workflows-studio/assets/images/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/_content/Elsa.Designer.Components.Web/elsa-workflows-studio/assets/images/favicon-16x16.png">
     <link rel="stylesheet" href="/_content/Elsa.Designer.Components.Web/elsa-workflows-studio/assets/fonts/inter/inter.css">
-    <link rel="stylesheet" href="/_content/Elsa.Designer.Components.Web/elsa-workflows-studio/assets/styles/tailwind.css">
+    <link rel="stylesheet" href="/_content/Elsa.Designer.Components.Web/elsa-workflows-studio/elsa-workflows-studio.css">
     <script src="/_content/Elsa.Designer.Components.Web/monaco-editor/min/vs/loader.js"></script>
     <script type="module" src="/_content/Elsa.Designer.Components.Web/elsa-workflows-studio/elsa-workflows-studio.esm.js"></script>
 </head>
 <body class="h-screen" style="background-size: 30px 30px; background-image: url(/_content/Elsa.Designer.Components.Web/elsa-workflows-studio/assets/images/tile.png); background-color: #FBFBFB;">
-<elsa-studio-root server-url="@serverUrl" monaco-lib-path="_content/Elsa.Designer.Components.Web/monaco-editor/min"></elsa-studio-root>
+    <elsa-studio-root server-url="@serverUrl" monaco-lib-path="_content/Elsa.Designer.Components.Web/monaco-editor/min">
+        <elsa-studio-dashboard></elsa-studio-dashboard>
+    </elsa-studio-root>
 </body>
 </html>
 ```
@@ -455,3 +462,9 @@ namespace ElsaDemo.Web.Menus
 * Now we can click the "Workflow" menu item, display the Elsa Dashboard and designing workflows.
 
 ![elsa-demo-result](./elsa-demo-result.gif)
+
+---
+> 🛠 Liked this post? I now share all my content on Substack — real-world .NET, AI, and scalable software design.
+> 👉 Subscribe here → engincanveske.substack.com
+> 🎥 Also, check out my YouTube channel for hands-on demos and deep dives: https://www.youtube.com/@engincanv
+---

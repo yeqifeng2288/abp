@@ -17,7 +17,19 @@ export function createTokenParser(format: string) {
 }
 
 export function interpolate(text: string, params: string[]) {
-  return text
-    .replace(/(['"]?\{\s*(\d+)\s*\}['"]?)/g, (_, match, digit) => params[digit] ?? match)
+ return text
+    .replace(/(['"])?\{\s*(\d+)\s*\}\1/g, (_, quote, digit) => 
+      (quote ? quote : '') + (params[digit] ?? `{${digit}}`) + (quote ? quote : '')
+    )
     .replace(/\s+/g, ' ');
+}
+
+export function escapeHtmlChars(value: any) {
+  return value && typeof value === 'string'
+    ? value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    : value;
 }

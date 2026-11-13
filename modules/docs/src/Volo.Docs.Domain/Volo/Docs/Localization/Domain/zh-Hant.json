@@ -29,13 +29,18 @@
     "FullSearch": "搜索文件",
     "Volo.Docs.Domain:010001": "Elastic search未啟用.",
     "MultipleVersionDocumentInfo": "此份文件有多個版本。請選擇一個最適合的。",
+    "DocumentOptions": "文件選項",
     "New": "新文檔",
     "Upd": "更新",
     "NewExplanation": "在最近兩周內創建.",
     "UpdatedExplanation": "在最近兩周內更新.",
     "Volo.Docs.Domain:010002": "簡稱 {ShortName} 已經存在.",
+    "Volo.Docs.Domain:010003": "找不到要求的文件!",
     "Preview": "預覽",
     "Search": "搜索",
-    "SearchResults": "搜索結果"
+    "SearchResults": "搜索結果",
+    "SearchInTheAllDocuments": "在所有文件中搜尋",
+    "GoogleTranslate": "谷歌翻譯",
+    "DownloadPDF": "下載PDF"
   }
 }

@@ -1,46 +1,41 @@
-$(function (){
+$(function () {
     var l = abp.localization.getResource("CmsKit");
-    
+
     var commentsService = volo.cmsKit.admin.comments.commentAdmin;
+    moment()._locale.preparse = (string) => string;
+    moment()._locale.postformat = (string) => string;
 
-    var detailsModal = new abp.ModalManager(abp.appPath + "CmsKit/Comments/DetailsModal");
-    
-    $(".input-daterange")
-        .datepicker({
-            todayBtn: "linked",
-            autoclose: true,
-            language: abp.localization.currentCulture.cultureName,
-        })
-        .on("hide", function (e) {
-            e.stopPropagation();
-        });
-    
+    var commentRequireApprovement = abp.setting.getBoolean("CmsKit.Comments.RequireApprovement");
+
+    if (commentRequireApprovement) {
+        $('#CommentsWaitingAlert').show()
+        $('#IsApprovedSelectInput').show();
+    }
+
+    var singleDatePicker = $('#CmsKitCommentsWrapper .singledatepicker');
+    singleDatePicker.daterangepicker({
+        "singleDatePicker": true,
+        "showDropdowns": true,
+        "autoUpdateInput": false,
+        "autoApply": true,
+        "opens": "center",
+        "drops": "auto"
+    });
+
+    singleDatePicker.attr('autocomplete', 'off');
+
+    singleDatePicker.on('apply.daterangepicker', function (ev, picker) {
+        $(this).val(picker.startDate.format('l'));
+    });
+
     var filterForm = $('#CmsKitCommentsFilterForm');
-    
+
     var getFilter = function () {
-        var filterObj = filterForm.serializeFormToObject();
-
-        var startDate = luxon.DateTime.fromFormat(
-            filterObj.creationStartDate,
-            abp.localization.currentCulture.dateTimeFormat.shortDatePattern,
-            { locale: abp.localization.currentCulture.cultureName }
-        );
-        if (!startDate.invalid) {
-            filterObj.creationStartDate = startDate.toFormat("yyyy-MM-dd");
-        }
-
-        var endDate = luxon.DateTime.fromFormat(
-            filterObj.creationEndDate,
-            abp.localization.currentCulture.dateTimeFormat.shortDatePattern,
-            { locale: abp.localization.currentCulture.cultureName }
-        );
-        if (!endDate.invalid) {
-            filterObj.creationEndDate = endDate.toFormat("yyyy-MM-dd");
-        }
-        
-        return filterObj;
+        filterForm.handleDatepicker('.singledatepicker');
+        var formObject = filterForm.serializeFormToObject();
+        return formObject;
     };
-    
+
     var _dataTable = $('#CommentsTable').DataTable(abp.libs.datatables.normalizeConfiguration({
         processing: true,
         serverSide: true,
@@ -73,9 +68,52 @@ $(function (){
                                 commentsService
                                     .delete(data.record.id)
                                     .then(function () {
-                                        _dataTable.ajax.reload();
-                                        abp.notify.success(l('SuccessfullyDeleted'));
+                                        _dataTable.ajax.reloadEx();
+                                        CheckWaitingComments()
+                                        abp.notify.success(l('DeletedSuccessfully'));
                                     });
+                            }
+                        },
+                        {
+                            text: function (data) {
+                                return data.isApproved ? l('Disapproved') : l('Approve');
+                            },
+                            action: function (data) {
+                                var newApprovalStatus = !data.record?.isApproved;
+
+                                commentsService
+                                    .updateApprovalStatus(data.record.id, { IsApproved: newApprovalStatus })
+                                    .then(function () {
+                                        _dataTable.ajax.reloadEx();
+                                        CheckWaitingComments()
+                                        var message = newApprovalStatus ? l('ApprovedSuccessfully') : l('ApprovalRevokedSuccessfully');
+                                        abp.notify.success(message);
+                                    })
+                            },
+                            visible: function (data) {
+                                return commentRequireApprovement;
+                            }
+                        },
+                        {
+                            text: function (data) {
+                                if (data.isApproved == null) {
+                                    return l('Disapproved')
+                                }
+                            },
+                            action: function (data) {
+                                var newApprovalStatus = false;
+
+                                commentsService
+                                    .updateApprovalStatus(data.record.id, { IsApproved: newApprovalStatus })
+                                    .then(function () {
+                                        _dataTable.ajax.reloadEx();
+                                        CheckWaitingComments()
+                                        var message = newApprovalStatus ? l('ApprovedSuccessfully') : l('ApprovalRevokedSuccessfully');
+                                        abp.notify.success(message);
+                                    })
+                            },
+                            visible: function (data) {
+                                return commentRequireApprovement && data.isApproved == null;
                             }
                         }
                     ]
@@ -106,6 +144,16 @@ $(function (){
                 }
             },
             {
+                title: l("URL"),
+                data: "url",
+                render: function (data, type, row) {
+                    if (data !== null) {
+                        return '<a href="' + data + '#comment-' + row.id + '" target="_blank"><i class="fa fa-location-arrow"></i></a>';
+                    }
+                    return "";
+                }
+            },
+            {
                 title: l("Text"),
                 data: "text",
                 orderable: false,
@@ -129,6 +177,28 @@ $(function (){
                 }
             },
             {
+                width: "5%",
+                title: l("ApproveState"),
+                orderable: false,
+                data: "isApproved",
+                visible: commentRequireApprovement,
+                render: function (data, type, row) {
+                    var icons = ''
+
+                    if (data === null) {
+                        icons = '<i class="fa-solid fa-hourglass-half text-muted"></i>';
+                    } else if (typeof data === "boolean") {
+                        if (data) {
+                            icons = '<i class="fa-solid fa-check text-success"></i>';
+                        } else {
+                            icons = '<i class="fa-solid fa-x text-danger"></i>';
+                        }
+                    }
+
+                    return icons;
+                }
+            },
+            {
                 width: "15%",
                 title: l("CreationTime"),
                 data: "creationTime",
@@ -137,22 +207,43 @@ $(function (){
             }
         ]
     }));
-    
-    function GetFilterableDatatableContent(filterSelector, data){
-        return '<span class="datatableCell" data-field="'+ filterSelector +'" data-val="'+ data +'">' + data + '</span>';
+
+    function GetFilterableDatatableContent(filterSelector, data) {
+        return '<span class="datatableCell" data-field="' + filterSelector + '" data-val="' + data + '">' + data + '</span>';
     }
-    
+
     $(document).on('click', '.datatableCell', function () {
         var inputSelector = $(this).attr('data-field');
         var value = $(this).attr('data-val');
-        
+
         $(inputSelector).val(value);
-        
-        _dataTable.ajax.reload();
+
+        _dataTable.ajax.reloadEx();
     });
 
-    filterForm.submit(function (e){
+    filterForm.submit(function (e) {
         e.preventDefault();
-        _dataTable.ajax.reload();
+        _dataTable.ajax.reloadEx();
     });
+
+    function CheckWaitingComments() { 
+        commentsService.getWaitingCount().then(function (count) {
+            if (count > 0) {
+                var alertMessage = l("CommentAlertMessage", count);
+                var alertElement = '<abp-alert alert-type="Warning">' + alertMessage + ' ' + ' <i class="fa-solid fa-arrow-up-right-from-square"></i> </abp-alert>';
+                
+                var commentAlert = $('#CommentsWaitingAlert');
+
+                commentAlert.html(alertElement);
+                commentAlert.click(function () {
+                    window.location.href = '/Cms/Comments/Approve'
+                });
+                commentAlert.css('cursor', 'pointer');
+            } else {
+                $('#CommentsWaitingAlert').hide()
+            }
+        });
+    }
+    
+    CheckWaitingComments()
 });

@@ -2,32 +2,46 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RequestLocalization;
+using Volo.Abp.Localization;
 using Volo.Abp.UI.Navigation;
 
-namespace Volo.Abp.AspNetCore.Components.Server.BasicTheme.Themes.Basic
+namespace Volo.Abp.AspNetCore.Components.Server.BasicTheme.Themes.Basic;
+
+public partial class LoginDisplay : IDisposable
 {
-    public partial class LoginDisplay : IDisposable
+    [Inject]
+    protected IMenuManager MenuManager { get; set; }
+
+    [Inject]
+    protected IHttpContextAccessor HttpContextAccessor { get; set; }
+
+    protected ApplicationMenu Menu { get; set; }
+
+    // Blazorise's dropdown-menu-end sets right: 0, which wins over the computed left offset in an RTL layout
+    protected static string MenuStyle => CultureHelper.IsRtl ? "right: auto" : null;
+
+    protected override async Task OnInitializedAsync()
     {
-        [Inject]
-        protected IMenuManager MenuManager { get; set; }
+        Menu = await MenuManager.GetAsync(StandardMenus.User);
 
-        protected ApplicationMenu Menu { get; set; }
+        Navigation.LocationChanged += OnLocationChanged;
+    }
 
-        protected override async Task OnInitializedAsync()
-        {
-            Menu = await MenuManager.GetAsync(StandardMenus.User);
+    protected string GetLoginUrl()
+    {
+        var culture = AbpRequestCultureCookieHelper.GetRouteCulture(HttpContextAccessor.HttpContext);
+        return string.IsNullOrEmpty(culture) ? "Account/Login" : $"{culture}/Account/Login";
+    }
 
-            Navigation.LocationChanged += OnLocationChanged;
-        }
+    protected virtual void OnLocationChanged(object sender, LocationChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
 
-        protected virtual void OnLocationChanged(object sender, LocationChangedEventArgs e)
-        {
-            InvokeAsync(StateHasChanged);
-        }
-
-        public void Dispose()
-        {
-            Navigation.LocationChanged -= OnLocationChanged;
-        }
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }

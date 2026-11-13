@@ -1,36 +1,57 @@
 ﻿using System;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Security.Encryption;
 
-namespace Volo.Abp.Settings
+namespace Volo.Abp.Settings;
+
+public class SettingEncryptionService : ISettingEncryptionService, ITransientDependency
 {
-    public class SettingEncryptionService : ISettingEncryptionService, ITransientDependency
+    protected IStringEncryptionService StringEncryptionService { get; }
+    public ILogger<SettingEncryptionService> Logger { get; set; }
+    protected IOptions<AbpSettingOptions> Options { get; }
+
+    public SettingEncryptionService(IStringEncryptionService stringEncryptionService, IOptions<AbpSettingOptions> options)
     {
-        protected IStringEncryptionService StringEncryptionService { get; }
+        StringEncryptionService = stringEncryptionService;
+        Options = options;
+        Logger = NullLogger<SettingEncryptionService>.Instance;
+    }
 
-        public SettingEncryptionService(IStringEncryptionService stringEncryptionService)
+    public virtual string? Encrypt(SettingDefinition settingDefinition, string? plainValue)
+    {
+        if (plainValue.IsNullOrEmpty())
         {
-            StringEncryptionService = stringEncryptionService;
+            return plainValue;
         }
 
-        public virtual string Encrypt(SettingDefinition settingDefinition, string plainValue)
-        {
-            if (plainValue.IsNullOrEmpty())
-            {
-                return plainValue;
-            }
+        return StringEncryptionService.Encrypt(plainValue);
+    }
 
-            return StringEncryptionService.Encrypt(plainValue);
+    public virtual string? Decrypt(SettingDefinition settingDefinition, string? encryptedValue)
+    {
+        if (encryptedValue.IsNullOrEmpty())
+        {
+            return encryptedValue;
         }
 
-        public virtual string Decrypt(SettingDefinition settingDefinition, string encryptedValue)
+        try
         {
-            if (encryptedValue.IsNullOrEmpty())
+            return StringEncryptionService.Decrypt(encryptedValue);
+        }
+        catch (Exception e)
+        {
+            if (Options.Value.ReturnOriginalValueIfDecryptFailed)
             {
+                Logger.LogWarning(e, "Failed to decrypt the setting: {0}. Returning the original value...", settingDefinition.Name);
                 return encryptedValue;
             }
-
-            return StringEncryptionService.Decrypt(encryptedValue);
+            
+            Logger.LogException(e);
+            
+            return string.Empty;
         }
     }
 }

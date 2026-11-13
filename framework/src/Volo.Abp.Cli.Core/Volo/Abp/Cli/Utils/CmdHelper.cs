@@ -1,149 +1,219 @@
-﻿using System.Diagnostics;
+using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Volo.Abp.DependencyInjection;
 
-namespace Volo.Abp.Cli.Utils
+namespace Volo.Abp.Cli.Utils;
+
+public class CmdHelper : ICmdHelper, ITransientDependency
 {
-    public class CmdHelper :  ICmdHelper, ITransientDependency
+    private const int SuccessfulExitCode = 0;
+
+    protected AbpCliOptions CliOptions { get; }
+
+    public CmdHelper(IOptionsSnapshot<AbpCliOptions> cliOptions)
     {
-        private const int SuccessfulExitCode = 0;
+        CliOptions = cliOptions.Value;
+    }
 
-        public void OpenWebPage(string url)
+    public void Open(string pathOrUrl)
+    {
+        //directory might contain 'space' character
+        pathOrUrl = pathOrUrl.EnsureStartsWith('"');
+        pathOrUrl = pathOrUrl.EnsureEndsWith('"');
+        
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                url = url.Replace("&", "^&");
-                Process.Start(new ProcessStartInfo("cmd", $"/c start {url}") { CreateNoWindow = true });
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                Process.Start("xdg-open", url);
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                Process.Start("open", url);
-            }
+            pathOrUrl = pathOrUrl.Replace("&", "^&");
+            Process.Start(new ProcessStartInfo("cmd", $"/c start \"\" {pathOrUrl}") { CreateNoWindow = true });
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            Process.Start("xdg-open", pathOrUrl);
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            Process.Start("open", pathOrUrl);
+        }
+    }
+
+    public void Run(string file, string arguments)
+    {
+        var procStartInfo = new ProcessStartInfo(file, arguments);
+
+        if (CliOptions.AlwaysHideExternalCommandOutput)
+        {
+            HideNewCommandWindow(procStartInfo);
         }
 
+        Process.Start(procStartInfo)?.WaitForExit();
+    }
 
-        public void Run(string file, string arguments)
+    public void RunCmd(string command, string workingDirectory = null)
+    {
+        RunCmd(command, out _, workingDirectory);
+    }
+
+    public void RunCmd(string command, out int exitCode, string workingDirectory = null)
+    {
+        var procStartInfo = new ProcessStartInfo(
+            GetFileName(),
+            GetArguments(command)
+        );
+
+        if (CliOptions.AlwaysHideExternalCommandOutput)
         {
-            var procStartInfo = new ProcessStartInfo(file, arguments);
-            Process.Start(procStartInfo)?.WaitForExit();
+            HideNewCommandWindow(procStartInfo);
         }
 
-        public void RunCmd(string command, string workingDirectory = null)
+        if (!string.IsNullOrEmpty(workingDirectory))
         {
-            RunCmd(command, out _, workingDirectory);
+            procStartInfo.WorkingDirectory = workingDirectory;
         }
 
-        public void RunCmd(string command, out int exitCode, string workingDirectory = null)
+        using (var process = Process.Start(procStartInfo))
         {
-            var procStartInfo = new ProcessStartInfo(
-                GetFileName(),
-                GetArguments(command)
-            );
+            process?.WaitForExit();
+
+            exitCode = process.ExitCode;
+            Environment.ExitCode = exitCode;
+        }
+    }
+
+    public Process RunCmdAndGetProcess(string command, string workingDirectory = null)
+    {
+        var procStartInfo = new ProcessStartInfo(
+            GetFileName(),
+            GetArguments(command)
+        );
+
+        if (CliOptions.AlwaysHideExternalCommandOutput)
+        {
+            HideNewCommandWindow(procStartInfo);
+        }
+
+        if (!string.IsNullOrEmpty(workingDirectory))
+        {
+            procStartInfo.WorkingDirectory = workingDirectory;
+        }
+
+        return Process.Start(procStartInfo);
+    }
+
+    public string RunCmdAndGetOutput(string command, string workingDirectory = null)
+    {
+        return RunCmdAndGetOutput(command, out int _, workingDirectory);
+    }
+
+    public string RunCmdAndGetOutput(string command, out bool isExitCodeSuccessful, string workingDirectory = null)
+    {
+        var output = RunCmdAndGetOutput(command, out int exitCode, workingDirectory);
+        isExitCodeSuccessful = exitCode == SuccessfulExitCode;
+        return output;
+    }
+
+    public string RunCmdAndGetOutput(string command, out int exitCode, string workingDirectory = null)
+    {
+        string output;
+
+        using (var process = new Process())
+        {
+            process.StartInfo = new ProcessStartInfo(GetFileName())
+            {
+                Arguments = GetArguments(command),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
 
             if (!string.IsNullOrEmpty(workingDirectory))
             {
-                procStartInfo.WorkingDirectory = workingDirectory;
+                process.StartInfo.WorkingDirectory = workingDirectory;
             }
 
-            using (var process = Process.Start(procStartInfo))
-            {
-                process?.WaitForExit();
+            process.Start();
 
-                exitCode = process.ExitCode;
-            }
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+
+            var results = Task.WhenAll(outputTask, errorTask).GetAwaiter().GetResult();
+            output = results[0] + results[1];
+
+            process.WaitForExit();
+
+            exitCode = process.ExitCode;
+            Environment.ExitCode = exitCode;
         }
 
-        public string RunCmdAndGetOutput(string command, string workingDirectory = null)
+        return output.Trim();
+    }
+
+    public void RunCmdAndExit(string command, string workingDirectory = null, int? delaySeconds = null)
+    {
+        var procStartInfo = new ProcessStartInfo(
+            GetFileName(),
+            GetArguments(command, delaySeconds)
+        );
+
+        if (!string.IsNullOrEmpty(workingDirectory))
         {
-            return RunCmdAndGetOutput(command, out int _, workingDirectory);
+            procStartInfo.WorkingDirectory = workingDirectory;
         }
 
-        public string RunCmdAndGetOutput(string command, out bool isExitCodeSuccessful, string workingDirectory = null)
+        if (CliOptions.AlwaysHideExternalCommandOutput)
         {
-            var output = RunCmdAndGetOutput(command, out int exitCode, workingDirectory);
-            isExitCodeSuccessful = exitCode == SuccessfulExitCode;
-            return output;
+            HideNewCommandWindow(procStartInfo);
         }
 
-        public string RunCmdAndGetOutput(string command, out int exitCode, string workingDirectory = null)
+        Process.Start(procStartInfo);
+        Environment.Exit(0);
+    }
+
+    public string GetArguments(string command, int? delaySeconds = null)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            string output;
-
-            using (var process = new Process())
-            {
-                process.StartInfo = new ProcessStartInfo(GetFileName())
-                {
-                    Arguments = GetArguments(command),
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-
-                if (!string.IsNullOrEmpty(workingDirectory))
-                {
-                    process.StartInfo.WorkingDirectory = workingDirectory;
-                }
-
-                process.Start();
-
-                using (var standardOutput = process.StandardOutput)
-                {
-                    using (var standardError = process.StandardError)
-                    {
-                        output = standardOutput.ReadToEnd();
-                        output += standardError.ReadToEnd();
-                    }
-                }
-
-                process.WaitForExit();
-
-                exitCode = process.ExitCode;
-            }
-
-            return output.Trim();
+            return delaySeconds == null ? "-c \"" + command + "\"" : "-c \"" + $"sleep {delaySeconds} > /dev/null && " + command + "\"";
         }
 
-        public string GetArguments(string command)
+        //Windows default.
+        return delaySeconds == null ? "/C \"" + command + "\"" : "/C \"" + $"timeout /nobreak /t {delaySeconds} >null && " + command + "\"";
+    }
+
+    public string GetFileName()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return "-c \"" + command + "\"";
-            }
-
-            //Windows default.
-            return "/C \"" + command + "\"";
+            //Windows
+            return "cmd.exe";
         }
 
-        public string GetFileName()
+        //Linux or OSX
+        if (File.Exists("/bin/bash"))
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                //Windows
-                return "cmd.exe";
-            }
-
-            //Linux or OSX
-            if (File.Exists("/bin/bash"))
-            {
-                return "/bin/bash";
-            }
-
-            if (File.Exists("/bin/sh"))
-            {
-                return "/bin/sh"; //some Linux distributions like Alpine doesn't have bash
-            }
-
-            throw new AbpException($"Cannot determine shell command for this OS! " +
-                                   $"Running on OS: {System.Runtime.InteropServices.RuntimeInformation.OSDescription} | " +
-                                   $"OS Architecture: {System.Runtime.InteropServices.RuntimeInformation.OSArchitecture} | " +
-                                   $"Framework: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription} | " +
-                                   $"Process Architecture{System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+            return "/bin/bash";
         }
+
+        if (File.Exists("/bin/sh"))
+        {
+            return "/bin/sh"; //some Linux distributions like Alpine doesn't have bash
+        }
+
+        throw new AbpException($"Cannot determine shell command for this OS! " +
+                               $"Running on OS: {System.Runtime.InteropServices.RuntimeInformation.OSDescription} | " +
+                               $"OS Architecture: {System.Runtime.InteropServices.RuntimeInformation.OSArchitecture} | " +
+                               $"Framework: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription} | " +
+                               $"Process Architecture{System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+    }
+
+    private void HideNewCommandWindow(ProcessStartInfo procStartInfo)
+    {
+        procStartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+        procStartInfo.CreateNoWindow = true;
     }
 }

@@ -6,34 +6,45 @@ using Volo.Abp.Application.Services;
 using Volo.Abp.Content;
 using Volo.Abp.TestApp.Application.Dto;
 
-namespace Volo.Abp.TestApp.Application
+namespace Volo.Abp.TestApp.Application;
+
+public interface IPeopleAppService : ICrudAppService<PersonDto, Guid>
 {
-    public interface IPeopleAppService : ICrudAppService<PersonDto, Guid>
-    {
-        Task<ListResultDto<PhoneDto>> GetPhones(Guid id, GetPersonPhonesFilter filter);
+    Task<ListResultDto<PhoneDto>> GetPhones(Guid id, GetPersonPhonesFilter filter);
 
-        Task<List<string>> GetParams(IEnumerable<Guid> ids, string[] names);
+    Task<List<string>> GetParams(IEnumerable<Guid> ids, string[] names);
 
-        Task<PhoneDto> AddPhone(Guid id, PhoneDto phoneDto);
+    Task<PhoneDto> AddPhone(Guid id, PhoneDto phoneDto);
 
-        Task RemovePhone(Guid id, string number);
+    Task RemovePhone(Guid id, string number);
 
-        Task GetWithAuthorized();
+    Task GetWithAuthorized();
 
-        Task<GetWithComplexTypeInput> GetWithComplexType(GetWithComplexTypeInput input);
+    Task GetWithAllowAnonymous();
 
-        Task<IRemoteStreamContent> DownloadAsync();
+    Task GetWithAuthorizePolicy();
 
-        Task<string> UploadAsync(IRemoteStreamContent streamContent);
+    Task<GetWithComplexTypeInput> GetWithComplexType(GetWithComplexTypeInput input);
 
-        Task<string> UploadMultipleAsync(IEnumerable<IRemoteStreamContent> streamContents);
+    Task<IRemoteStreamContent> DownloadAsync();
 
-        Task<string> CreateFileAsync(CreateFileInput input);
+    Task<string> UploadAsync(IRemoteStreamContent streamContent);
 
-        Task<string> CreateMultipleFileAsync(CreateMultipleFileInput input);
+    Task<string> UploadMultipleAsync(IEnumerable<IRemoteStreamContent> streamContents);
 
-        Task<string> GetParamsFromQueryAsync(GetParamsInput input);
+    Task<string> CreateFileAsync(CreateFileInput input);
 
-        Task<string> GetParamsFromFormAsync(GetParamsInput input);
-    }
+    Task<string> CreateMultipleFileAsync(CreateMultipleFileInput input);
+
+    Task<string> GetParamsFromQueryAsync(GetParamsInput input);
+
+    Task<string> GetParamsFromFormAsync(GetParamsInput input);
+
+    Task<string> EchoStatusAsync();
+
+    Task<string> EchoStatusWithProducesJsonAsync();
+
+    Task<IRemoteStreamContent> GetBinaryImageAsync();
+
+    Task<string> ThrowFromStringAsync();
 }

@@ -29,13 +29,18 @@
     "FullSearch": "Keresés a dokumentumokban",
     "Volo.Docs.Domain:010001": "A Elastic search nincs engedélyezve.",
     "MultipleVersionDocumentInfo": "Ennek a dokumentumnak több változata van. Válassza ki az Ön számára legmegfelelőbb lehetőségeket.",
+    "DocumentOptions": "Dokumentumbeállítások",
     "New": "Új",
     "Upd": "Mód",
     "NewExplanation": "Az elmúlt két hétben készült.",
     "UpdatedExplanation": "Az elmúlt két hétben frissült.",
     "Volo.Docs.Domain:010002": "Rövid név {ShortName} már létezik.",
+    "Volo.Docs.Domain:010003": "Hoppá, a kért dokumentum nem található!",
     "Preview": "előnézet",
     "Search": "Keresés",
-    "SearchResults": "Keresési eredmények"
+    "SearchResults": "Keresési eredmények",
+    "SearchInTheAllDocuments": "Keressen az összes dokumentumban",
+    "GoogleTranslate": "Google Fordító",
+    "DownloadPDF": "PDF letöltése"
   }
 }

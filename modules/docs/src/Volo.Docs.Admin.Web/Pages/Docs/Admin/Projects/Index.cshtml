@@ -20,19 +20,19 @@
 
 @section scripts {
     <abp-script src="/client-proxies/docs-admin-proxy.js" />
+    <abp-script src="/client-proxies/docs-common-proxy.js" />
     <abp-script src="/Pages/Docs/Admin/Projects/index.js" />
     <abp-script src="/Pages/Docs/Admin/Projects/create.js" />
     <abp-script src="/Pages/Docs/Admin/Projects/edit.js" />
     <abp-script src="/Pages/Docs/Admin/Projects/pull.js" />
+    <abp-script src="/Pages/Docs/Admin/Projects/managePdfFiles.js" />
+    <abp-script src="/Pages/Docs/Admin/Projects/generatePdf.js" />
 }
 
 <abp-card>
     <abp-card-header>
         <abp-row>
-            <abp-column size-md="_6">
-                <h2>@L["Projects"]</h2>
-            </abp-column>
-            <abp-column size-md="_6" class="text-end">
+            <abp-column size-md="_12" class="text-end">
                 @if (await Authorization.IsGrantedAsync(DocsAdminPermissions.Projects.Create))
                 {
                     <abp-dropdown>
@@ -50,7 +50,7 @@
         </abp-row>
     </abp-card-header>
     <abp-card-body>
-        <abp-table striped-rows="true" id="ProjectsTable" class="nowrap">
+        <abp-table  id="ProjectsTable" class="nowrap">
             <thead>
                 <tr>
                     <th>@L["Actions"]</th>

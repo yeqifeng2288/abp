@@ -3,32 +3,36 @@ using Volo.Abp.AspNetCore.Mvc.ApplicationConfigurations;
 using Volo.Abp.Caching;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EventBus;
-using Volo.Abp.Users;
 
-namespace Volo.Abp.AspNetCore.Mvc.Client
+namespace Volo.Abp.AspNetCore.Mvc.Client;
+
+public class MvcCurrentApplicationConfigurationCacheResetEventHandler :
+    ILocalEventHandler<CurrentApplicationConfigurationCacheResetEventData>,
+    ITransientDependency
 {
-    public class MvcCurrentApplicationConfigurationCacheResetEventHandler :
-        ILocalEventHandler<CurrentApplicationConfigurationCacheResetEventData>,
-        ITransientDependency
+    protected IDistributedCache<ApplicationConfigurationDto> Cache { get; }
+    protected IDistributedCache<MvcCachedApplicationVersionCacheItem> ApplicationVersionCache { get; }
+    protected MvcCachedApplicationConfigurationClientHelper CacheHelper { get; }
+
+    public MvcCurrentApplicationConfigurationCacheResetEventHandler(
+        IDistributedCache<ApplicationConfigurationDto> cache,
+        IDistributedCache<MvcCachedApplicationVersionCacheItem> applicationVersionCache,
+        MvcCachedApplicationConfigurationClientHelper cacheHelper)
     {
-        protected ICurrentUser CurrentUser { get; }
-        protected IDistributedCache<ApplicationConfigurationDto> Cache { get; }
+        Cache = cache;
+        ApplicationVersionCache = applicationVersionCache;
+        CacheHelper = cacheHelper;
+    }
 
-        public MvcCurrentApplicationConfigurationCacheResetEventHandler(ICurrentUser currentUser,
-            IDistributedCache<ApplicationConfigurationDto> cache)
+    public virtual async Task HandleEventAsync(CurrentApplicationConfigurationCacheResetEventData eventData)
+    {
+        if (eventData.UserId.HasValue)
         {
-            CurrentUser = currentUser;
-            Cache = cache;
+            await Cache.RemoveAsync(await CacheHelper.CreateCacheKeyAsync(eventData.UserId));
         }
-
-        public virtual async Task HandleEventAsync(CurrentApplicationConfigurationCacheResetEventData eventData)
+        else
         {
-            await Cache.RemoveAsync(CreateCacheKey());
-        }
-
-        protected virtual string CreateCacheKey()
-        {
-            return MvcCachedApplicationConfigurationClientHelper.CreateCacheKey(CurrentUser);
+            await ApplicationVersionCache.RemoveAsync(MvcCachedApplicationVersionCacheItem.CacheKey);
         }
     }
 }

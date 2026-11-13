@@ -1,6 +1,7 @@
 import program from 'commander';
 import execa from 'execa';
 import fse from 'fs-extra';
+import { join } from 'path';
 import replaceWithPreview from './replace-with-preview';
 const semverParse = require('semver/functions/parse');
 
@@ -31,10 +32,6 @@ program.parse(process.argv);
   try {
     await fse.remove('../dist/packages');
 
-    await execa('yarn', ['install'], { stdout: 'inherit', cwd: '../' });
-
-    await updateVersion(program.nextVersion);
-
     if (!program.skipVersionValidation) {
       await execa(
         'yarn',
@@ -51,7 +48,22 @@ program.parse(process.argv);
 
     if (program.preview) await replaceWithPreview(program.nextVersion);
 
-    await execa('yarn', ['build', '--noInstall', '--skipNgcc'], { stdout: 'inherit' });
+    const parallel = process.env.NX_PARALLEL || '2';
+    await execa(
+      'yarn',
+      [
+        'nx',
+        'run-many',
+        '--target=build',
+        '--all',
+        '--exclude=dev-app,schematics',
+        '--prod',
+        '--parallel',
+        String(parallel),
+      ],
+      { stdout: 'inherit', cwd: '../' },
+    );
+
     await execa('yarn', ['build:schematics'], { stdout: 'inherit' });
   } catch (error) {
     console.error(error.stderr);
@@ -63,9 +75,10 @@ program.parse(process.argv);
   try {
     await fse.rename('../lerna.publish.json', '../lerna.json');
 
-    let tag: string;
+    let tag: string | undefined;
     if (program.preview) tag = 'preview';
     else if (semverParse(program.nextVersion).prerelease?.length) tag = 'next';
+    else tag = await resolveMaintenanceDistTag(program.nextVersion, registry);
 
     await execa(
       'yarn',
@@ -102,15 +115,29 @@ program.parse(process.argv);
 })();
 
 async function updateVersion(version: string) {
-  await fse.rename('../lerna.version.json', '../lerna.json');
-
-  await execa(
-    'yarn',
-    ['lerna', 'version', version, '--yes', '--no-commit-hooks', '--skip-git', '--force-publish'],
-    { stdout: 'inherit', cwd: '../' },
-  );
-
-  await fse.rename('../lerna.json', '../lerna.version.json');
+  await execa('yarn', ['update-version', version], { stdout: 'inherit', cwd: '../' });
 
   await execa('yarn', ['replace-with-tilde']);
+}
+
+// npm refuses to move the "latest" dist-tag to an older version. A patch of a
+// previous release line (10.6.2 while 10.7.0 is latest) must use another tag.
+async function resolveMaintenanceDistTag(version: string, registry: string) {
+  try {
+    const { stdout } = await execa(
+      'node',
+      [
+        join(__dirname, '../../publish-utils.js'),
+        '--distTag',
+        registry,
+        '--customVersion',
+        version,
+      ],
+      { cwd: join(__dirname, '../..') },
+    );
+    return stdout.trim() || undefined;
+  } catch (error) {
+    console.error(error.stderr || error);
+    return undefined;
+  }
 }

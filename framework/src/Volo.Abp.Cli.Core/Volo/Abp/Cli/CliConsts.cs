@@ -1,15 +1,31 @@
-﻿namespace Volo.Abp.Cli
+namespace Volo.Abp.Cli;
+
+public static class CliConsts
 {
-    public static class CliConsts
+    public static string Command = "AbpCliCommand";
+
+    public static string BranchPrefix = "branch@";
+
+    public static string DocsLink = "https://abp.io/docs";
+
+    public static string HttpClientName = "AbpHttpClient";
+
+    public static string GithubHttpClientName = "GithubHttpClient";
+
+    public static string LogoutUrl = CliUrls.AccountAbpIo + "api/license/logout";
+
+    public static string LicenseCodePlaceHolder = @"<LICENSE_CODE/>";
+
+    public static string AppSettingsJsonFileName = "appsettings.json";
+
+    public static string AppSettingsSecretJsonFileName = "appsettings.secrets.json";
+
+    public const string McpLogLevelEnvironmentVariable = "ABP_MCP_LOG_LEVEL";
+    public const string DefaultMcpServerUrl = "https://mcp.abp.io";
+
+    public static class MemoryKeys
     {
-        public const string Command = "AbpCliCommand";
-
-        public const string BranchPrefix = "branch@";
-
-        public const string DocsLink = "https://docs.abp.io";
-
-        public const string HttpClientName = "AbpHttpClient";
-
-        public const string LogoutUrl = CliUrls.WwwAbpIo + "api/license/logout";
+        public const string LatestCliVersionCheckDate = "LatestCliVersionCheckDate";
+        public const string McpToolsLastFetchDate = "McpToolsLastFetchDate";
     }
 }

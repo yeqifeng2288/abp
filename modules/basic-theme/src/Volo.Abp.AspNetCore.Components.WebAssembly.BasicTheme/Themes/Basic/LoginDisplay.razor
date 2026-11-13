@@ -1,17 +1,18 @@
 ﻿@using Microsoft.Extensions.Localization
-@using Volo.Abp.Users
-@using Volo.Abp.MultiTenancy
 @using global::Localization.Resources.AbpUi
+@using Microsoft.Extensions.Options
+@using Volo.Abp.AspNetCore.Components.Web
+@using Volo.Abp.UI.Navigation
 @inherits AbpComponentBase
-@inject ICurrentUser CurrentUser
-@inject ICurrentTenant CurrentTenant
 @inject IJSRuntime JsRuntime
 @inject NavigationManager Navigation
 @inject IStringLocalizer<AbpUiResource> UiLocalizer
+@inject IOptions<AuthenticationOptions> AuthenticationOptions
+@inject IOptions<AbpAspNetCoreComponentsWebOptions> AbpAspNetCoreComponentsWebOptions
 <AuthorizeView>
     <Authorized>
-        <Dropdown>
-            <DropdownToggle Color="Color.None">
+        <Dropdown EndAligned="true">
+            <DropdownToggle Color="Color.Default">
                 @if (CurrentTenant.Name != null)
                 {
                     <span><i>@CurrentTenant.Name</i>\@CurrentUser.UserName</span>
@@ -21,12 +22,20 @@
                     <span>@CurrentUser.UserName</span>
                 }
             </DropdownToggle>
-            <DropdownMenu>
+            <DropdownMenu Style="@MenuStyle">
                 @if (Menu != null)
                 {
                     @foreach (var menuItem in Menu.Items)
                     {
-                        <DropdownItem Clicked="@(() => NavigateToAsync(menuItem.Url, menuItem.Target))">@menuItem.DisplayName</DropdownItem>
+                        var componentType = menuItem.GetComponentTypeOrDefault();
+                        if (componentType != null)
+                        {
+                            <DynamicComponent Type="@componentType" />
+                        }
+                        else
+                        {
+                            <DropdownItem Clicked="@(() => NavigateToAsync(menuItem.Url, menuItem.Target))">@menuItem.DisplayName</DropdownItem>
+                        }
                     }
                 }
                 <DropdownDivider />
@@ -35,6 +44,6 @@
         </Dropdown>
     </Authorized>
     <NotAuthorized>
-        <a class="nav-link" href="authentication/login">@UiLocalizer["Login"]</a>
+        <a class="nav-link" href="@LoginUrl">@UiLocalizer["Login"]</a>
     </NotAuthorized>
 </AuthorizeView>

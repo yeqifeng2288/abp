@@ -6,99 +6,159 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
 using Volo.Abp.Application.Dtos;
+using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Domain.Entities;
 using Volo.Abp.ObjectExtending;
 using Volo.Abp.Validation;
 
-namespace Volo.Abp.Identity.Web.Pages.Identity.Users
+namespace Volo.Abp.Identity.Web.Pages.Identity.Users;
+
+public class EditModalModel : IdentityPageModel
 {
-    public class EditModalModel : IdentityPageModel
+    [BindProperty]
+    public UserInfoViewModel UserInfo { get; set; }
+
+    [BindProperty]
+    public AssignedRoleViewModel[] Roles { get; set; }
+
+    public DetailViewModel Detail { get; set; }
+
+    protected IIdentityUserAppService IdentityUserAppService { get; }
+
+    protected IPermissionChecker PermissionChecker { get; }
+
+    public bool IsEditCurrentUser { get; set; }
+
+    public EditModalModel(IIdentityUserAppService identityUserAppService, IPermissionChecker permissionChecker)
     {
-        [BindProperty]
-        public UserInfoViewModel UserInfo { get; set; }
+        IdentityUserAppService = identityUserAppService;
+        PermissionChecker = permissionChecker;
+    }
 
-        [BindProperty]
-        public AssignedRoleViewModel[] Roles { get; set; }
-
-        protected IIdentityUserAppService IdentityUserAppService { get; }
-
-        public EditModalModel(IIdentityUserAppService identityUserAppService)
+    public virtual async Task<IActionResult> OnGetAsync(Guid id)
+    {
+        var user = await IdentityUserAppService.GetAsync(id);
+        UserInfo = ObjectMapper.Map<IdentityUserDto, UserInfoViewModel>(user);
+        if (await PermissionChecker.IsGrantedAsync(IdentityPermissions.Users.ManageRoles))
         {
-            IdentityUserAppService = identityUserAppService;
-        }
+            var assignableRoles = (await IdentityUserAppService.GetAssignableRolesAsync()).Items;
+            var currentRoles = (await IdentityUserAppService.GetRolesAsync(id)).Items;
+            
+            // Combine assignable and current roles to show all roles user has
+            var combinedRoles = assignableRoles
+                .Concat(currentRoles)
+                .GroupBy(role => role.Id)
+                .Select(group => group.First())
+                .ToList();
 
-        public virtual async Task<IActionResult> OnGetAsync(Guid id)
-        {
-            UserInfo = ObjectMapper.Map<IdentityUserDto, UserInfoViewModel>(await IdentityUserAppService.GetAsync(id));
+            Roles = ObjectMapper.Map<IReadOnlyList<IdentityRoleDto>, AssignedRoleViewModel[]>(combinedRoles);
 
-            Roles = ObjectMapper.Map<IReadOnlyList<IdentityRoleDto>, AssignedRoleViewModel[]>((await IdentityUserAppService.GetAssignableRolesAsync()).Items);
-
-            var userRoleNames = (await IdentityUserAppService.GetRolesAsync(UserInfo.Id)).Items.Select(r => r.Name).ToList();
+            var currentRoleIds = currentRoles.Select(r => r.Id).ToHashSet();
+            var assignableRoleIds = assignableRoles.Select(r => r.Id).ToHashSet();
             foreach (var role in Roles)
             {
-                if (userRoleNames.Contains(role.Name))
-                {
-                    role.IsAssigned = true;
-                }
+                role.IsAssigned = currentRoleIds.Contains(role.Id);
+                role.IsAssignable = assignableRoleIds.Contains(role.Id);
             }
-
-            return Page();
         }
-
-        public virtual async Task<IActionResult> OnPostAsync()
+        else
         {
-            ValidateModel();
-
-            var input = ObjectMapper.Map<UserInfoViewModel, IdentityUserUpdateDto>(UserInfo);
-            input.RoleNames = Roles.Where(r => r.IsAssigned).Select(r => r.Name).ToArray();
-            await IdentityUserAppService.UpdateAsync(UserInfo.Id, input);
-
-            return NoContent();
+            Roles = Array.Empty<AssignedRoleViewModel>();
         }
+        
+        IsEditCurrentUser = CurrentUser.Id == id;
 
-        public class UserInfoViewModel : ExtensibleObject, IHasConcurrencyStamp
+        Detail = ObjectMapper.Map<IdentityUserDto, DetailViewModel>(user);
+
+        Detail.CreatedBy = await GetUserNameOrNullAsync(user.CreatorId);
+        Detail.ModifiedBy = await GetUserNameOrNullAsync(user.LastModifierId);
+
+        return Page();
+    }
+
+    private async Task<string> GetUserNameOrNullAsync(Guid? userId)
+    {
+        if (!userId.HasValue)
         {
-            [HiddenInput]
-            public Guid Id { get; set; }
-
-            [HiddenInput]
-            public string ConcurrencyStamp { get; set; }
-
-            [Required]
-            [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxUserNameLength))]
-            public string UserName { get; set; }
-
-            [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxNameLength))]
-            public string Name { get; set; }
-
-            [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxSurnameLength))]
-            public string Surname { get; set; }
-
-            [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPasswordLength))]
-            [DataType(DataType.Password)]
-            [DisableAuditing]
-            public string Password { get; set; }
-
-            [Required]
-            [EmailAddress]
-            [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxEmailLength))]
-            public string Email { get; set; }
-
-            [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPhoneNumberLength))]
-            public string PhoneNumber { get; set; }
-
-            public bool IsActive { get; set; }
-
-            public bool LockoutEnabled { get; set; }
+            return null;
         }
 
-        public class AssignedRoleViewModel
-        {
-            [Required]
-            [HiddenInput]
-            public string Name { get; set; }
+        var user = await IdentityUserAppService.FindByIdAsync(userId.Value);
+        return user?.UserName;
+    }
 
-            public bool IsAssigned { get; set; }
-        }
+    public virtual async Task<IActionResult> OnPostAsync()
+    {
+        ValidateModel();
+
+        var input = ObjectMapper.Map<UserInfoViewModel, IdentityUserUpdateDto>(UserInfo);
+        input.RoleNames = Roles.Where(r => r.IsAssigned).Select(r => r.Name).ToArray();
+        await IdentityUserAppService.UpdateAsync(UserInfo.Id, input);
+
+        return NoContent();
+    }
+
+    public class UserInfoViewModel : ExtensibleObject, IHasConcurrencyStamp
+    {
+        [HiddenInput]
+        public Guid Id { get; set; }
+
+        [HiddenInput]
+        public string ConcurrencyStamp { get; set; }
+
+        [Required]
+        [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxUserNameLength))]
+        public string UserName { get; set; }
+
+        [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxNameLength))]
+        public string Name { get; set; }
+
+        [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxSurnameLength))]
+        public string Surname { get; set; }
+
+        [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPasswordLength))]
+        [DataType(DataType.Password)]
+        [DisableAuditing]
+        public string Password { get; set; }
+
+        [Required]
+        [EmailAddress]
+        [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxEmailLength))]
+        public string Email { get; set; }
+
+        [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPhoneNumberLength))]
+        public string PhoneNumber { get; set; }
+
+        public bool IsActive { get; set; }
+
+        public bool LockoutEnabled { get; set; }
+    }
+
+    public class AssignedRoleViewModel
+    {
+        public Guid Id { get; set; }
+
+        [Required]
+        [HiddenInput]
+        public string Name { get; set; }
+
+        public bool IsAssigned { get; set; }
+
+        public bool IsAssignable { get; set; }
+    }
+
+    public class DetailViewModel
+    {
+        public string CreatedBy { get; set; }
+        public DateTime? CreationTime { get; set; }
+
+        public string ModifiedBy { get; set; }
+        public DateTime? LastModificationTime { get; set; }
+
+        public DateTimeOffset? LastPasswordChangeTime { get; set; }
+
+        public DateTimeOffset? LockoutEnd { get; set; }
+
+        public int AccessFailedCount { get; set; }
     }
 }

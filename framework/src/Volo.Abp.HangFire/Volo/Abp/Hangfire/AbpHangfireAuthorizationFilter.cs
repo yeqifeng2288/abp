@@ -1,54 +1,49 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Hangfire.Dashboard;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
-using Volo.Abp.Authorization.Permissions;
-using Volo.Abp.Users;
+using Volo.Abp.Authorization;
+using Volo.Abp.MultiTenancy;
 
-namespace Volo.Abp.Hangfire
+namespace Volo.Abp.Hangfire;
+
+public class AbpHangfireAuthorizationFilter : IDashboardAsyncAuthorizationFilter
 {
-    public class AbpHangfireAuthorizationFilter : IDashboardAsyncAuthorizationFilter
+    private readonly bool _enableTenant;
+    private readonly AuthorizationPolicyBuilder _policyBuilder;
+
+    public virtual AuthorizationPolicyBuilder PolicyBuilder => _policyBuilder;
+
+    public AbpHangfireAuthorizationFilter(bool enableTenant = false, string? requiredPermissionName = null, params string[]? requiredRoleNames)
     {
-        private readonly bool _enableTenant;
-        private readonly string _requiredPermissionName;
-
-        public AbpHangfireAuthorizationFilter(bool enableTenant = false, string requiredPermissionName = null)
+        _enableTenant = enableTenant;
+        _policyBuilder = new AuthorizationPolicyBuilder().RequireAuthenticatedUser();
+        if (!requiredPermissionName.IsNullOrWhiteSpace())
         {
-            _enableTenant = requiredPermissionName.IsNullOrWhiteSpace() ? enableTenant : true; 
-            _requiredPermissionName = requiredPermissionName;
+            _policyBuilder.Requirements.Add(new PermissionRequirement(requiredPermissionName));
         }
 
-        public async Task<bool> AuthorizeAsync(DashboardContext context)
+        if (!requiredRoleNames.IsNullOrEmpty())
         {
-            if (!IsLoggedIn(context, _enableTenant))
+            foreach (var roleName in requiredRoleNames!)
             {
-                return false;
+                _policyBuilder.RequireRole(roleName);
             }
-
-            if (_requiredPermissionName.IsNullOrEmpty())
-            {
-                return true;
-            }
-
-            return await IsPermissionGrantedAsync(context, _requiredPermissionName);
         }
+    }
 
-        private static bool IsLoggedIn(DashboardContext context, bool enableTenant)
+    public virtual async Task<bool> AuthorizeAsync(DashboardContext context)
+    {
+        var currentTenant = context.GetHttpContext().RequestServices.GetRequiredService<ICurrentTenant>();
+        if (currentTenant.IsAvailable && !_enableTenant)
         {
-            var currentUser = context.GetHttpContext().RequestServices.GetRequiredService<ICurrentUser>();
-
-            if (!enableTenant)
-            {
-                return currentUser.IsAuthenticated && !currentUser.TenantId.HasValue;
-            }
-            
-            return currentUser.IsAuthenticated;
+            return false;
         }
 
-        private static async Task<bool> IsPermissionGrantedAsync(DashboardContext context, string requiredPermissionName)
-        {
-            var permissionChecker = context.GetHttpContext().RequestServices.GetRequiredService<IPermissionChecker>();
-            return await permissionChecker.IsGrantedAsync(requiredPermissionName);
-        }
+        var authorizationService = context.GetHttpContext().RequestServices.GetRequiredService<IAuthorizationService>();
+        var authorizationPolicy = _policyBuilder.Build();
+        return (await authorizationService.AuthorizeAsync(context.GetHttpContext().User, authorizationPolicy)).Succeeded;
     }
 }

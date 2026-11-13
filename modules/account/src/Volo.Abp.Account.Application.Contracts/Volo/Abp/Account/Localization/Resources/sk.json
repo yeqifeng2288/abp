@@ -1,6 +1,7 @@
 {
   "culture": "sk",
   "texts": {
+    "Menu:Account": "Účet",
     "UserName": "Používateľské meno",
     "EmailAddress": "Emailová adresa",
     "UserNameOrEmailAddress": "Používateľské meno alebo emailová adresa",
@@ -10,6 +11,8 @@
     "UserLockedOutMessage": "Používateľské konto bolo uzamknuté z dôvodu neplatných pokusov o prihlásenie. Chvíľu počkajte a skúste to znova.",
     "InvalidUserNameOrPassword": "Neplatné používateľské meno alebo heslo!",
     "LoginIsNotAllowed": "Nemáte povolenie sa prihlásiť! Váš účet je neaktívny alebo potrebuje potvrdiť váš e -mail/telefónne číslo.",
+    "ExternalLoginPasswordChangeRequired": "Nemáte povolenie sa prihlásiť! Vaše heslo musí byť zmenené, čo však pri externom prihlásení nie je možné. Kontaktujte prosím svojho správcu.",
+    "RegisteredButLoginIsNotAllowed": "Váš účet bol vytvorený, ale zatiaľ nemáte povolenie sa prihlásiť!",
     "SelfRegistrationDisabledMessage": "Samostatná registrácia je pre túto aplikáciu vypnutá. Ak chcete zaregistrovať nového používateľa, obráťte sa na správcu aplikácie.",
     "LocalLoginDisabledMessage": "Lokálne prihlásenie je pre túto aplikáciu zakázané.",
     "Login": "Prihlásiť",
@@ -33,8 +36,11 @@
     "DisplayName:PhoneNumber": "Telefónne číslo",
     "PersonalSettings": "Osobné nastavenia",
     "PersonalSettingsSaved": "Osobné nastavenia boli uložené",
+    "PersonalSettingsChangedConfirmationModalTitle": "Osobné údaje zmenené",
+    "PersonalSettingsChangedConfirmationModalDescription": "Ak chcete použiť tieto zmeny, musíte sa prihlásiť. Chcete sa odhlásiť?",
     "PasswordChanged": "Heslo bolo zmenené",
     "NewPasswordConfirmFailed": "Prosím potvrďte nové heslo.",
+    "NewPasswordSameAsOld": "Nové heslo musí byť odlišné od aktuálneho.",
     "Manage": "Spravovať",
     "MyAccount": "Môj účet",
     "DisplayName:Abp.Account.IsSelfRegistrationEnabled": "Je povolená samoregistrácia",
@@ -49,7 +55,7 @@
     "SendPasswordResetLink_Information": "Na váš email vám bude odoslaný odkaz na obnovenie hesla. Ak do niekoľkých minút nedostanete email, skúste to znova.",
     "PasswordResetMailSentMessage": "Email o obnovení účtu bol odoslaný na vašu emailovú adresu. Ak tento email neuvidíte v doručenej pošte do 15 minút, pozrite sa do priečinku nevyžiadanej pošty (spam). Ak ho tam nájdete, označte ho ako -Nie je spam-.",
     "ResetPassword": "Obnoviť heslo",
-    "ConfirmPassword": "Potvrďte (zopakujte) heslo",
+    "ConfirmPassword": "Potvrďte heslo",
     "ResetPassword_Information": "Zadajte svoje nové heslo.",
     "YourPasswordIsSuccessfullyReset": "Vaše heslo bolo úspešne obnovené.",
     "GoToTheApplication": "Prejdite do aplikácie",
@@ -62,6 +68,10 @@
     "PasswordResetInfoInEmail": "Dostali sme žiadosť na obnovenie účtu! Ak ste o zmenu žiadali vy, kliknite na nasledujúci link a obnovte svoje heslo.",
     "ResetMyPassword": "Obnovte moje heslo",
     "AccessDenied": "Prístup zamietnutý!",
-    "AccessDeniedMessage": "K tomuto zdroju nemáte prístup."
+    "AccessDeniedMessage": "K tomuto zdroju nemáte prístup.",
+    "OrRegisterWith": "Alebo sa zaregistrujte pomocou:",
+    "RegisterUsingYourProviderAccount": "Zaregistrujte sa pomocou svojho {0} účtu",
+    "RequireMigrateSeedTitle": "Nepodarilo sa nájsť používateľa správcu",
+    "RequireMigrateSeedMessage": "Uistite sa, že je spustené seed databázy. Pozrite si <a target=\"_blank\" href=\"https://abp.io/kb/0003\">dokumentáciu</a> pre možné riešenia."
   }
 }

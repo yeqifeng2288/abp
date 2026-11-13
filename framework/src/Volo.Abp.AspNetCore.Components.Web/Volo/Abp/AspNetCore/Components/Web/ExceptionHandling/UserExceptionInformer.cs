@@ -8,66 +8,81 @@ using Volo.Abp.AspNetCore.Components.Messages;
 using Volo.Abp.AspNetCore.ExceptionHandling;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Http;
+using Volo.Abp.Http.Client;
 
-namespace Volo.Abp.AspNetCore.Components.Web.ExceptionHandling
+namespace Volo.Abp.AspNetCore.Components.Web.ExceptionHandling;
+
+[Dependency(ReplaceServices = true)]
+public class UserExceptionInformer : IUserExceptionInformer, IScopedDependency
 {
-    [Dependency(ReplaceServices = true)]
-    public class UserExceptionInformer : IUserExceptionInformer, IScopedDependency
+    public ILogger<UserExceptionInformer> Logger { get; set; }
+    protected IUiMessageService MessageService { get; }
+    protected IExceptionToErrorInfoConverter ExceptionToErrorInfoConverter { get; }
+
+    protected AbpExceptionHandlingOptions Options { get; }
+
+    public UserExceptionInformer(
+        IUiMessageService messageService,
+        IExceptionToErrorInfoConverter exceptionToErrorInfoConverter,
+        IOptions<AbpExceptionHandlingOptions> options)
     {
-        public ILogger<UserExceptionInformer> Logger { get; set; }
-        protected IUiMessageService MessageService { get; }
-        protected IExceptionToErrorInfoConverter ExceptionToErrorInfoConverter { get; }
+        MessageService = messageService;
+        ExceptionToErrorInfoConverter = exceptionToErrorInfoConverter;
+        Options = options.Value;
+        Logger = NullLogger<UserExceptionInformer>.Instance;
+    }
 
-        protected AbpExceptionHandlingOptions Options { get; }
+    public void Inform(UserExceptionInformerContext context)
+    {
+        //TODO: Create sync versions of the MessageService APIs.
 
-        public UserExceptionInformer(
-            IUiMessageService messageService,
-            IExceptionToErrorInfoConverter exceptionToErrorInfoConverter,
-            IOptions<AbpExceptionHandlingOptions> options)
+        LogException(context);
+
+        var errorInfo = GetErrorInfo(context);
+
+        if (errorInfo.Details.IsNullOrEmpty())
         {
-            MessageService = messageService;
-            ExceptionToErrorInfoConverter = exceptionToErrorInfoConverter;
-            Options = options.Value;
-            Logger = NullLogger<UserExceptionInformer>.Instance;
+            MessageService.Error(errorInfo.Message!);
+        }
+        else
+        {
+            MessageService.Error(errorInfo.Details!, errorInfo.Message);
+        }
+    }
+
+    public async Task InformAsync(UserExceptionInformerContext context)
+    {
+        LogException(context);
+
+        var errorInfo = GetErrorInfo(context);
+
+        if (errorInfo.Details.IsNullOrEmpty())
+        {
+            await MessageService.Error(errorInfo.Message!);
+        }
+        else
+        {
+            await MessageService.Error(errorInfo.Details!, errorInfo.Message);
+        }
+    }
+
+    protected virtual RemoteServiceErrorInfo GetErrorInfo(UserExceptionInformerContext context)
+    {
+        return ExceptionToErrorInfoConverter.Convert(context.Exception, options =>
+        {
+            options.SendExceptionsDetailsToClients = Options.SendExceptionsDetailsToClients;
+            options.SendStackTraceToClients = Options.SendStackTraceToClients;
+            options.SendExceptionDataToClientTypes = Options.SendExceptionDataToClientTypes;
+        });
+    }
+
+    protected virtual void LogException(UserExceptionInformerContext context)
+    {
+        if (context.Exception is AbpRemoteCallException && OperatingSystem.IsBrowser())
+        {
+            return;
         }
 
-        public void Inform(UserExceptionInformerContext context)
-        {
-            //TODO: Create sync versions of the MessageService APIs.
-
-            var errorInfo = GetErrorInfo(context);
-
-            if (errorInfo.Details.IsNullOrEmpty())
-            {
-                MessageService.Error(errorInfo.Message);
-            }
-            else
-            {
-                MessageService.Error(errorInfo.Details, errorInfo.Message);
-            }
-        }
-
-        public async Task InformAsync(UserExceptionInformerContext context)
-        {
-            var errorInfo = GetErrorInfo(context);
-
-            if (errorInfo.Details.IsNullOrEmpty())
-            {
-                await MessageService.Error(errorInfo.Message);
-            }
-            else
-            {
-                await MessageService.Error(errorInfo.Details, errorInfo.Message);
-            }
-        }
-
-        protected virtual RemoteServiceErrorInfo GetErrorInfo(UserExceptionInformerContext context)
-        {
-            return ExceptionToErrorInfoConverter.Convert(context.Exception, options =>
-            {
-                options.SendExceptionsDetailsToClients = Options.SendExceptionsDetailsToClients;
-                options.SendStackTraceToClients = Options.SendStackTraceToClients;
-            });
-        }
+        Logger.LogException(context.Exception);
     }
 }

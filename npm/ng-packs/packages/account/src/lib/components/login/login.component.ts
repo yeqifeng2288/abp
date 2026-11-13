@@ -1,34 +1,53 @@
-import { AuthService, ConfigStateService } from '@abp/ng.core';
-import { ToasterService } from '@abp/ng.theme.shared';
-import { Component, Injector, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Component, Injector, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import {
+  ReactiveFormsModule,
+  UntypedFormBuilder,
+  UntypedFormGroup,
+  Validators,
+} from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { throwError } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
-import { eAccountComponents } from '../../enums/components';
-import { getRedirectUrl } from '../../utils/auth-utils';
+import {
+  AuthService,
+  AutofocusDirective,
+  ConfigStateService,
+  LocalizationPipe,
+  NgxValidateCoreModule,
+} from '@abp/ng.core';
+import { ButtonComponent, ToasterService } from '@abp/ng.theme.shared';
+import { eAccountComponents } from '../../enums';
+import { getRedirectUrl } from '../../utils';
 
 const { maxLength, required } = Validators;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'abp-login',
   templateUrl: './login.component.html',
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    LocalizationPipe,
+    ButtonComponent,
+    NgxValidateCoreModule,
+    AutofocusDirective,
+  ],
 })
 export class LoginComponent implements OnInit {
-  form: FormGroup;
+  protected injector = inject(Injector);
+  protected fb = inject(UntypedFormBuilder);
+  protected toasterService = inject(ToasterService);
+  protected authService = inject(AuthService);
+  protected configState = inject(ConfigStateService);
 
-  inProgress: boolean;
+  form!: UntypedFormGroup;
+
+  readonly inProgress = signal(false);
 
   isSelfRegistrationEnabled = true;
 
   authWrapperKey = eAccountComponents.AuthWrapper;
-
-  constructor(
-    protected injector: Injector,
-    protected fb: FormBuilder,
-    protected toasterService: ToasterService,
-    protected authService: AuthService,
-    protected configState: ConfigStateService,
-  ) {}
 
   ngOnInit() {
     this.init();
@@ -53,7 +72,7 @@ export class LoginComponent implements OnInit {
   onSubmit() {
     if (this.form.invalid) return;
 
-    this.inProgress = true;
+    this.inProgress.set(true);
 
     const { username, password, rememberMe } = this.form.value;
 
@@ -67,12 +86,12 @@ export class LoginComponent implements OnInit {
             err.error?.error_description ||
               err.error?.error.message ||
               'AbpAccount::DefaultErrorMessage',
-            null,
+            '',
             { life: 7000 },
           );
-          return throwError(err);
+          return throwError(() => err);
         }),
-        finalize(() => (this.inProgress = false)),
+        finalize(() => this.inProgress.set(false)),
       )
       .subscribe();
   }

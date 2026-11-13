@@ -1,42 +1,64 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Entities.Events;
 using Volo.Abp.EventBus;
+using Volo.Abp.Features;
+using Volo.Abp.GlobalFeatures;
+using Volo.CmsKit.Features;
+using Volo.CmsKit.GlobalFeatures;
 using Volo.CmsKit.Pages;
 
-namespace Volo.CmsKit.Menus
+namespace Volo.CmsKit.Menus;
+
+public class PageChangedHandler :
+    ILocalEventHandler<EntityUpdatedEventData<Page>>,
+    ITransientDependency
 {
-    public class PageChangedHandler : 
-        ILocalEventHandler<EntityUpdatedEventData<Page>>,
-        ITransientDependency
+    protected IFeatureChecker FeatureChecker { get; set; }
+    protected IMenuItemRepository MenuRepository { get; }
+    protected MenuItemManager MenuManager { get; }
+
+    public PageChangedHandler(
+        IFeatureChecker featureChecker,
+        IMenuItemRepository menuRepository,
+        MenuItemManager menuManager)
     {
-        protected IMenuItemRepository MenuRepository { get; }
-        protected MenuItemManager MenuManager { get; }
+        FeatureChecker = featureChecker;
+        MenuRepository = menuRepository;
+        MenuManager = menuManager;
+    }
 
-        public PageChangedHandler(
-            IMenuItemRepository menuRepository,
-            MenuItemManager menuManager)
+    public async Task HandleEventAsync(EntityUpdatedEventData<Page> eventData)
+    {
+        if(!GlobalFeatureManager.Instance.IsEnabled<MenuFeature>())
         {
-            MenuRepository = menuRepository;
-            MenuManager = menuManager;
+            return;
         }
 
-        public async Task HandleEventAsync(EntityUpdatedEventData<Page> eventData)
+        if(!await FeatureChecker.IsEnabledAsync(CmsKitFeatures.MenuEnable))
         {
-            // TODO: Write a repository query.
-            var allMenuItems = await MenuRepository.GetListAsync();
-
-            var affectedMenuItems = allMenuItems
-                                    .Where(x => x.PageId == eventData.Entity.Id)
-                                    .ToArray();
-
-            foreach (var menuItem in affectedMenuItems)
-            {
-                MenuManager.SetPageUrl(menuItem, eventData.Entity);
-            }
-
-            await MenuRepository.UpdateManyAsync(affectedMenuItems);
+            return;
         }
+
+        // TODO: Write a repository query.
+        var allMenuItems = await MenuRepository.GetListAsync();
+
+        var affectedMenuItems = allMenuItems
+                                .Where(x => x.PageId == eventData.Entity.Id)
+                                .ToArray();
+
+        if (affectedMenuItems.IsNullOrEmpty())
+        {
+            return;
+        }
+
+        foreach (var menuItem in affectedMenuItems)
+        {
+            MenuManager.SetPageUrl(menuItem, eventData.Entity);
+        }
+
+        await MenuRepository.UpdateManyAsync(affectedMenuItems);
     }
 }

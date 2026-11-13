@@ -6,87 +6,113 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Volo.Abp.AspNetCore.Auditing;
 using Volo.Abp.Auditing;
 using Volo.Abp.Uow;
 using Volo.Abp.Users;
 
-namespace Volo.Abp.AspNetCore.SignalR.Auditing
+namespace Volo.Abp.AspNetCore.SignalR.Auditing;
+
+public class AbpAuditHubFilter : IHubFilter
 {
-    public class AbpAuditHubFilter : IHubFilter
+    public virtual async ValueTask<object?> InvokeMethodAsync(HubInvocationContext invocationContext, Func<HubInvocationContext, ValueTask<object?>> next)
     {
-        public virtual async ValueTask<object> InvokeMethodAsync(HubInvocationContext invocationContext, Func<HubInvocationContext, ValueTask<object>> next)
+        var options = invocationContext.ServiceProvider.GetRequiredService<IOptions<AbpAuditingOptions>>().Value;
+        if (!options.IsEnabled || IsIgnoredHub(invocationContext))
         {
-            var options = invocationContext.ServiceProvider.GetRequiredService<IOptions<AbpAuditingOptions>>().Value;
-            if (!options.IsEnabled)
-            {
-                return await next(invocationContext);
-            }
+            return await next(invocationContext);
+        }
 
-            var hasError = false;
-            var auditingManager = invocationContext.ServiceProvider.GetRequiredService<IAuditingManager>();
-            using (var saveHandle = auditingManager.BeginScope())
+        var hasError = false;
+        var auditingManager = invocationContext.ServiceProvider.GetRequiredService<IAuditingManager>();
+        using (var saveHandle = auditingManager.BeginScope())
+        {
+            Debug.Assert(auditingManager.Current != null);
+            object? result;
+            try
             {
-                Debug.Assert(auditingManager.Current != null);
-                object result;
-                try
-                {
-                    result = await next(invocationContext);
+                result = await next(invocationContext);
 
-                    if (auditingManager.Current.Log.Exceptions.Any())
-                    {
-                        hasError = true;
-                    }
-                }
-                catch (Exception ex)
+                if (auditingManager.Current.Log.Exceptions.Any())
                 {
                     hasError = true;
-
-                    if (!auditingManager.Current.Log.Exceptions.Contains(ex))
-                    {
-                        auditingManager.Current.Log.Exceptions.Add(ex);
-                    }
-
-                    throw;
                 }
-                finally
+            }
+            catch (Exception ex)
+            {
+                hasError = true;
+
+                if (!auditingManager.Current.Log.Exceptions.Contains(ex))
                 {
-                    if (ShouldWriteAuditLog(invocationContext.ServiceProvider, hasError))
+                    auditingManager.Current.Log.Exceptions.Add(ex);
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (await ShouldWriteAuditLogAsync(auditingManager.Current.Log, invocationContext.ServiceProvider, hasError))
+                {
+                    var unitOfWorkManager = invocationContext.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+                    if (unitOfWorkManager.Current != null)
                     {
-                        var unitOfWorkManager = invocationContext.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-                        if (unitOfWorkManager.Current != null)
+                        try
                         {
                             await unitOfWorkManager.Current.SaveChangesAsync();
                         }
-
-                        await saveHandle.SaveAsync();
+                        catch (Exception ex)
+                        {
+                            if (!auditingManager.Current.Log.Exceptions.Contains(ex))
+                            {
+                                auditingManager.Current.Log.Exceptions.Add(ex);
+                            }
+                        }
                     }
+
+                    await saveHandle.SaveAsync();
                 }
-
-                return result;
             }
-        }
 
-        private bool ShouldWriteAuditLog(IServiceProvider serviceProvider, bool hasError)
+            return result;
+        }
+    }
+
+    protected virtual bool IsIgnoredHub(HubInvocationContext invocationContext)
+    {
+        var options = invocationContext.ServiceProvider.GetRequiredService<IOptions<AbpAspNetCoreAuditingOptions>>().Value;
+        var hubType = invocationContext.Hub.GetType();
+        return options.IgnoredHubTypes.Any(ignoredHubType => ignoredHubType.IsAssignableFrom(hubType));
+    }
+
+    private async Task<bool> ShouldWriteAuditLogAsync(AuditLogInfo auditLogInfo, IServiceProvider serviceProvider, bool hasError)
+    {
+        var options = serviceProvider.GetRequiredService<IOptions<AbpAuditingOptions>>().Value;
+
+        foreach (var selector in options.AlwaysLogSelectors)
         {
-            var options = serviceProvider.GetRequiredService<IOptions<AbpAuditingOptions>>().Value;
-            if (options.AlwaysLogOnException && hasError)
+            if (await selector(auditLogInfo))
             {
                 return true;
             }
+        }
 
-            if (!options.IsEnabledForAnonymousUsers && !serviceProvider.GetRequiredService<ICurrentUser>().IsAuthenticated)
-            {
-                return false;
-            }
-
-            var auditingManager = serviceProvider.GetRequiredService<IAuditingManager>();
-            if (auditingManager.Current == null ||
-                auditingManager.Current.Log.Actions.IsNullOrEmpty())
-            {
-                return false;
-            }
-
+        if (options.AlwaysLogOnException && hasError)
+        {
             return true;
         }
+
+        if (!options.IsEnabledForAnonymousUsers && !serviceProvider.GetRequiredService<ICurrentUser>().IsAuthenticated)
+        {
+            return false;
+        }
+
+        var auditingManager = serviceProvider.GetRequiredService<IAuditingManager>();
+        if (auditingManager.Current == null ||
+            auditingManager.Current.Log.Actions.IsNullOrEmpty())
+        {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -1,4 +1,5 @@
 ﻿@page "/tenant-management/tenants"
+@page "/{culture}/tenant-management/tenants"
 @attribute [Authorize(TenantManagementPermissions.Tenants.Default)]
 @using Microsoft.AspNetCore.Authorization
 @using Volo.Abp.FeatureManagement.Blazor.Components
@@ -8,6 +9,9 @@
 @using Volo.Abp.BlazoriseUI.Components.ObjectExtending
 @using Volo.Abp.AspNetCore.Components.Web
 @inject AbpBlazorMessageLocalizerHelper<AbpTenantManagementResource> LH
+@using Microsoft.Extensions.Localization
+@using Volo.Abp.UI.Navigation.Localization.Resource
+@inject IStringLocalizer<AbpUiNavigationResource> LUiNavigation
 @inherits AbpCrudPageBase<ITenantAppService, TenantDto, Guid, GetTenantsInput, TenantCreateDto, TenantUpdateDto>
 
 <Card>
@@ -35,9 +39,9 @@
 @* ************************* CREATE MODAL ************************* *@
 @if ( HasCreatePermission )
 {
-    <Modal @ref="CreateModal" Closing="@ClosingCreateModal">
-        <ModalContent Centered="true">
-            <Form>
+    <Modal @ref="CreateModal" Closing="@ClosingCreateModal" Centered="true">
+        <ModalContent>
+            <Form id="CreateTenantForm">
                 <ModalHeader>
                     <ModalTitle>@L["NewTenant"]</ModalTitle>
                     <CloseButton Clicked="CloseCreateModalAsync"/>
@@ -46,40 +50,48 @@
                     <Validations @ref="@CreateValidationsRef" Model="@NewEntity" ValidateOnLoad="false">
                         <Validation MessageLocalizer="@LH.Localize">
                             <Field>
-                                <FieldLabel>@L["TenantName"]</FieldLabel>
-                                <TextEdit @bind-Text="@NewEntity.Name" Autofocus="true">
+                                <FieldLabel>@L["TenantName"] *</FieldLabel>
+                                <TextInput @bind-Value="@NewEntity.Name" Autofocus="true">
                                     <Feedback>
                                         <ValidationError/>
                                     </Feedback>
-                                </TextEdit>
+                                </TextInput>
                             </Field>
                         </Validation>
                         <Validation MessageLocalizer="@LH.Localize">
                             <Field>
-                                <FieldLabel>@L["DisplayName:AdminEmailAddress"]</FieldLabel>
-                                <TextEdit Role="@TextRole.Email" @bind-Text="@NewEntity.AdminEmailAddress">
+                                <FieldLabel>@L["DisplayName:AdminEmailAddress"] *</FieldLabel>
+                                <TextInput Role="@TextRole.Email" @bind-Value="@NewEntity.AdminEmailAddress">
                                     <Feedback>
                                         <ValidationError/>
                                     </Feedback>
-                                </TextEdit>
+                                </TextInput>
                             </Field>
                         </Validation>
                         <Validation MessageLocalizer="@LH.Localize">
-                            <Field>
-                                <FieldLabel>@L["DisplayName:AdminPassword"]</FieldLabel>
-                                <TextEdit Role="@TextRole.Password" @bind-Text="@NewEntity.AdminPassword">
-                                    <Feedback>
-                                        <ValidationError/>
-                                    </Feedback>
-                                </TextEdit>
-                            </Field>
+						<Field>
+                             <FieldLabel>@L["DisplayName:AdminPassword"] *</FieldLabel>
+                             <Addons>
+                                <Addon AddonType="AddonType.Body">
+                                    <TextInput Role="ShowPassword ? TextRole.Text : TextRole.Password" @bind-Value="@NewEntity.AdminPassword">
+                                    </TextInput>
+                                </Addon>
+                                <Addon AddonType="AddonType.End">
+                                    <Button Color="Color.Secondary" Clicked="@(() => TogglePasswordVisibility())"
+                                            aria-label="@UiLocalizer["ShowPassword"]" aria-pressed="@(ShowPassword ? "true" : "false")">
+                                        <Icon Name="ShowPassword ? IconName.Eye : IconName.EyeSlash" aria-hidden="true" />
+                                    </Button>
+                                </Addon>
+                            </Addons>
+                            <ValidationError Style="display: block" />
+                         </Field>
                         </Validation>
-                        <ExtensionProperties TEntityType="TenantCreateDto" TResourceType="AbpTenantManagementResource" Entity="@NewEntity" LH="@LH"/>
+                        <ExtensionProperties TEntityType="TenantCreateDto" TResourceType="AbpTenantManagementResource" Entity="@NewEntity" LH="@LH" ModalType="ExtensionPropertyModalType.CreateModal" />
                     </Validations>
                 </ModalBody>
                 <ModalFooter>
-                    <Button Color="Color.Secondary" Clicked="CloseCreateModalAsync">@L["Cancel"]</Button>
-                    <SubmitButton Clicked="@CreateEntityAsync"/>
+                    <Button Color="Color.Primary" Outline Clicked="CloseCreateModalAsync">@L["Cancel"]</Button>
+                    <SubmitButton Form="CreateTenantForm" Clicked="@CreateEntityAsync"/>
                 </ModalFooter>
             </Form>
         </ModalContent>
@@ -89,9 +101,9 @@
 @* ************************* EDIT MODAL ************************* *@
 @if ( HasUpdatePermission )
 {
-    <Modal @ref="EditModal" Closing="@ClosingEditModal">
-        <ModalContent Centered="true">
-            <Form>
+    <Modal @ref="EditModal" Closing="@ClosingEditModal" Centered="true">
+        <ModalContent>
+            <Form id="EditTenantForm">
                 <ModalHeader>
                     <ModalTitle>@L["Edit"]</ModalTitle>
                     <CloseButton Clicked="CloseEditModalAsync"/>
@@ -100,20 +112,20 @@
                     <Validations @ref="@EditValidationsRef" Model="@EditingEntity" ValidateOnLoad="false">
                         <Validation MessageLocalizer="@LH.Localize">
                             <Field>
-                                <FieldLabel>@L["TenantName"]</FieldLabel>
-                                <TextEdit @bind-Text="@EditingEntity.Name" Autofocus="true">
+                                <FieldLabel>@L["TenantName"] *</FieldLabel>
+                                <TextInput @bind-Value="@EditingEntity.Name" Autofocus="true">
                                     <Feedback>
                                         <ValidationError/>
                                     </Feedback>
-                                </TextEdit>
+                                </TextInput>
                             </Field>
                         </Validation>
                     </Validations>
-                    <ExtensionProperties TEntityType="TenantUpdateDto" TResourceType="AbpTenantManagementResource" Entity="@EditingEntity" LH="@LH"/>
+                    <ExtensionProperties TEntityType="TenantUpdateDto" TResourceType="AbpTenantManagementResource" Entity="@EditingEntity" LH="@LH" ModalType="ExtensionPropertyModalType.EditModal" />
                 </ModalBody>
                 <ModalFooter>
-                    <Button Color="Color.Secondary" Clicked="CloseEditModalAsync">@L["Cancel"]</Button>
-                    <SubmitButton Clicked="@UpdateEntityAsync"/>
+                    <Button Color="Color.Primary" Outline Clicked="CloseEditModalAsync">@L["Cancel"]</Button>
+                    <SubmitButton Form="EditTenantForm" Clicked="@UpdateEntityAsync"/>
                 </ModalFooter>
             </Form>
         </ModalContent>

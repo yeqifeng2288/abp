@@ -20,19 +20,17 @@
                     ul.dropdown-menu {
                         li {
                             cursor: pointer;
-                            padding: 5px;
-
-                            a {
-                                display: block;
-                            }
-                        }
-
-                        li:hover {
-                            background: #f4f5f8;
                         }
                     }
                 }
             }
         }
+    }
+}
+
+.abp-action-button {
+    ui.dropdown-menu[data-popper-reference-hidden] {
+      visibility: hidden;
+      pointer-events: none;
     }
 }

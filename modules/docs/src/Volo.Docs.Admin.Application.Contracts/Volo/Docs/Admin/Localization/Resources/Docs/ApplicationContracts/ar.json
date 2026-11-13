@@ -1,7 +1,7 @@
 {
   "culture": "ar",
   "texts": {
-    "Permission:DocumentManagement": "إدارة الوثائق",
+    "Permission:DocumentManagement": "إدارة المستندات",
     "Permission:Projects": "المشروعات",
     "Permission:Edit": "تعديل",
     "Permission:Delete": "حذف",
@@ -37,12 +37,12 @@
     "DisplayName:LanguageCode": "رمز اللغة",
     "DisplayName:Version": "إصدار",
     "Documents": "وثائق",
-    "RemoveFromCache": "حذف من الذاكرة",
+    "RemoveFromCache": "إزالة من ذاكرة التخزين المؤقت وإعادة الفهرس",
     "Reindex": "إعادة الفهرسة",
     "ReindexCompleted": "تمت إعادة الفهرسة",
-    "RemovedFromCache": "تم الحذف من ذاكرة التخزين",
-    "RemoveFromCacheConfirmation": "هل أنت متأكد من حذف هذا العنصر من ذاكرة التخزين؟",
-    "ReIndexDocumentConfirmation": "هل أنت متأكد من إعادة فهرسة هذا العنصر؟",
+    "RemovedFromCache": "تمت إزالته من ذاكرة التخزين المؤقت وإعادة فهرسته",
+    "RemoveFromCacheConfirmation": "هل تريد بالتأكيد إعادة فهرسة  \"{0} \"؟",
+    "ReIndexDocumentConfirmation": "هل تريد بالتأكيد إعادة فهرسة \"{0}\"؟",
     "DeleteFromDatabase": "حذف من قاعدة البيانات",
     "Deleted": "محذوف",
     "Search": "بحث",
@@ -54,6 +54,21 @@
     "Version": "إصدار",
     "LanguageCode": "رمز اللغة",
     "FileName": "اسم الملف",
-    "LastCachedTime": "وقت ذاكرة التخزين"
+    "LastCachedTime": "وقت ذاكرة التخزين",
+    "Project": "مشروع ",
+    "AdvancedFilters": "مرشحات متقدمة",
+    "RemoveCacheAndReIndexConfirmation": "ستتم إزالة المستند \"{0}\" من ذاكرة التخزين المؤقت وإعادة فهرسته. هل تؤكد؟",
+    "GeneratePdf": "توليد PDF",
+    "Generating": "يتم توليد...",
+    "Language": "اللغة",
+    "ForceToGenerateNewPdf": "قوة لتوليد PDF جديد",
+    "PdfGeneratedSuccessfully": "تم توليد PDF بنجاح",
+    "GenerateAndDownloadPdf": "توليد وتحميل PDF",
+    "PdfFileDeletionWarningMessage": "هل أنت متأكد أنك تريد حذف ملف PDF \"{0}\"?",
+    "ManagePdfFiles": "إدارة ملفات PDF",
+    "Permission:ManagePdfFiles": "إدارة ملفات PDF",
+    "PdfDeletedSuccessfully": "تم حذف ملف PDF بنجاح",
+    "PdfGenerationStarted": "بدأ إنشاء ملف PDF",
+    "PdfGenerationStartedInfoMessage": "بدأ إنشاء ملف PDF. بمجرد اكتمال العملية، يمكنك التحقق مما إذا تمت إضافة الملف في قسم ملفات PDF."
   }
 }

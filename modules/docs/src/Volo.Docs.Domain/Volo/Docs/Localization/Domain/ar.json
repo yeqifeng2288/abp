@@ -29,13 +29,18 @@
     "FullSearch": "ابحث في المستندات",
     "Volo.Docs.Domain:010001": "لم يتم تمكين البحث المرن.",
     "MultipleVersionDocumentInfo": "هذا المستند له إصدارات متعددة. حدد الخيارات الأنسب لك.",
+    "DocumentOptions": "خيارات المستند",
     "New": "جديد",
     "Upd": "مُحدث",
     "NewExplanation": "تم إنشاؤه في الأسبوعين الماضيين.",
     "UpdatedExplanation": "تم التحديث في الأسبوعين الماضيين.",
     "Volo.Docs.Domain:010002": "الاسم المختصر {ShortName} موجود بالفعل.",
+    "Volo.Docs.Domain:010003": "عفواً، الوثيقة المطلوبة غير موجودة!",
     "Preview": "معاينة",
     "Search": "بحث",
-    "SearchResults": "نتائج البحث"
+    "SearchResults": "نتائج البحث",
+    "SearchInTheAllDocuments": "البحث في جميع الوثائق",
+    "GoogleTranslate": "ترجمة جوجل",
+    "DownloadPDF": "تحميل PDF"
   }
 }

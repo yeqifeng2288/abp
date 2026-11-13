@@ -29,13 +29,18 @@
     "FullSearch": "दस्तावेजों में खोजें",
     "Volo.Docs.Domain:010001": "लोचदार खोज सक्षम नहीं है।",
     "MultipleVersionDocumentInfo": "इस दस्तावेज़ के कई संस्करण हैं। आपके लिए सबसे उपयुक्त विकल्प का चयन करें।",
+    "DocumentOptions": "दस्तावेज़ विकल्प",
     "New": "नवीन व",
     "Upd": "युपीडी",
     "NewExplanation": "पिछले दो हफ्तों में बनाया गया।",
     "UpdatedExplanation": "पिछले दो हफ्तों में अपडेट किया गया।",
     "Volo.Docs.Domain:010002": "ShortName {ShortName} पहले से मौजूद है।",
+    "Volo.Docs.Domain:010003": "ओह, अनुरोधित दस्तावेज़ नहीं मिला!",
     "Preview": "पूर्व दर्शन",
     "Search": "खोज",
-    "SearchResults": "खोज परिणाम"
+    "SearchResults": "खोज परिणाम",
+    "SearchInTheAllDocuments": "सभी दस्तावेज़ों में खोजें",
+    "GoogleTranslate": "गूगल अनुवाद",
+    "DownloadPDF": "PDF डाउनलोड करें"
   }
 }

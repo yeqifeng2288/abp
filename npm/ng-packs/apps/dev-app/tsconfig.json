@@ -14,15 +14,20 @@
     }
   ],
   "compilerOptions": {
-    "forceConsistentCasingInFileNames": true,
     "strict": false,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true,
-    "allowSyntheticDefaultImports": true
+    "skipLibCheck": true,
+    "target": "es2022",
+    "moduleResolution": "bundler",
+    "module": "preserve",
+    "allowSyntheticDefaultImports": true,
+    "strictPropertyInitialization": false,
+    "useDefineForClassFields": false
   },
   "angularCompilerOptions": {
-    "strictInjectionParameters": true,
+    "strictInjectionParameters": false,
     "strictInputAccessModifiers": false,
-    "strictTemplates": false
+    "strictTemplates": true
   }
 }

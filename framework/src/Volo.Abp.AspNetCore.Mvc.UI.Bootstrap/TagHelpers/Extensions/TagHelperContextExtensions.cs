@@ -1,20 +1,16 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using Microsoft.AspNetCore.Razor.TagHelpers;
-using Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Form;
+﻿using Microsoft.AspNetCore.Razor.TagHelpers;
 
-namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Extensions
+namespace Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Extensions;
+
+public static class TagHelperContextExtensions
 {
-    public static class TagHelperContextExtensions
+    public static T GetValue<T>(this TagHelperContext context, string key)
     {
-        public static T GetValue<T>(this TagHelperContext context, string key)
+        if (!context.Items.ContainsKey(key))
         {
-            if (!context.Items.ContainsKey(key))
-            {
-                return default(T);
-            }
-
-            return (T)context.Items[key];
+            return default(T)!;
         }
+
+        return (T)context.Items[key];
     }
 }

@@ -1,7 +1,7 @@
-import { chain, SchematicContext, Tree } from '@angular-devkit/schematics';
+import { chain, Tree } from '@angular-devkit/schematics';
 import { GenerateProxySchema } from '../../models';
 import {
-  buildDefaultPath,
+  buildTargetPath,
   createApiDefinitionGetter,
   createApisGenerator,
   createProxyClearer,
@@ -11,6 +11,7 @@ import {
   createProxyWarningSaver,
   mergeAndAllowDelete,
   removeDefaultPlaceholders,
+  resolveProxyResourceApi,
   resolveProject,
 } from '../../utils';
 
@@ -19,22 +20,26 @@ export default function (schema: GenerateProxySchema) {
   const moduleName = params.module || 'app';
 
   return chain([
-    async (host: Tree, _context: SchematicContext) => {
+    async (host: Tree) => {
       const target = await resolveProject(host, params.target!);
-      const targetPath = buildDefaultPath(target.definition);
+      const targetPath = buildTargetPath(target.definition, params.entryPoint);
       const readProxyConfig = createProxyConfigReader(targetPath);
       let generated: string[] = [];
+      let previousResourceApi = false;
 
       try {
-        generated = readProxyConfig(host).generated;
+        const previousConfig = readProxyConfig(host);
+        generated = previousConfig.generated;
+        previousResourceApi = resolveProxyResourceApi(params, previousConfig);
         const index = generated.findIndex(m => m === moduleName);
         if (index < 0) generated.push(moduleName);
       } catch (_) {
         generated.push(moduleName);
+        previousResourceApi = resolveProxyResourceApi(params);
       }
 
       const getApiDefinition = createApiDefinitionGetter(params);
-      const data = { generated, ...(await getApiDefinition(host)) };
+      const data = { generated, resourceApi: previousResourceApi, ...(await getApiDefinition(host)) };
       data.generated = [];
 
       const clearProxy = createProxyClearer(targetPath);
@@ -43,7 +48,7 @@ export default function (schema: GenerateProxySchema) {
 
       const saveProxyWarning = createProxyWarningSaver(targetPath);
 
-      const generateApis = createApisGenerator(schema, generated);
+      const generateApis = createApisGenerator({ ...schema, resourceApi: previousResourceApi }, generated);
 
       const generateIndex = createProxyIndexGenerator(targetPath);
 

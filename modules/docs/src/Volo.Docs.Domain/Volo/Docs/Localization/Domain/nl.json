@@ -29,13 +29,18 @@
     "FullSearch": "Zoek in documenten",
     "Volo.Docs.Domain:010001": "Elastisch zoeken is niet ingeschakeld.",
     "MultipleVersionDocumentInfo": "Dit document heeft meerdere versies. Selecteer de opties die het beste bij u passen.",
+    "DocumentOptions": "Documentopties",
     "New": "Nieuw",
     "Upd": "Bew",
     "NewExplanation": "Gemaakt in de afgelopen twee weken.",
     "UpdatedExplanation": "Bewerkt in de afgelopen twee weken.",
     "Volo.Docs.Domain:010002": "KorteNaam {ShortName} bestaat al.",
+    "Volo.Docs.Domain:010003": "Oeps, het opgevraagde document is niet gevonden!",
     "Preview": "voorbeeld",
     "Search": "Zoeken",
-    "SearchResults": "Zoekresultaten"
+    "SearchResults": "Zoekresultaten",
+    "SearchInTheAllDocuments": "Zoek in alle documenten",
+    "GoogleTranslate": "Google Vertalen",
+    "DownloadPDF": "PDF downloaden"
   }
 }

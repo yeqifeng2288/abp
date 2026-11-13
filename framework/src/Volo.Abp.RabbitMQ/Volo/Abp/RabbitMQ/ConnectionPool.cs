@@ -1,74 +1,83 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using Volo.Abp.DependencyInjection;
+using Volo.Abp.Threading;
 
-namespace Volo.Abp.RabbitMQ
+namespace Volo.Abp.RabbitMQ;
+
+public class ConnectionPool : IConnectionPool, ISingletonDependency
 {
-    public class ConnectionPool : IConnectionPool, ISingletonDependency
+    protected AbpRabbitMqOptions Options { get; }
+
+    protected ConcurrentDictionary<string, IConnection> Connections { get; }
+
+    protected SemaphoreSlim Semaphore = new SemaphoreSlim(1, 1);
+
+    private bool _isDisposed;
+
+    public ConnectionPool(IOptions<AbpRabbitMqOptions> options)
     {
-        protected AbpRabbitMqOptions Options { get; }
+        Options = options.Value;
+        Connections = new ConcurrentDictionary<string, IConnection>();
+    }
 
-        protected ConcurrentDictionary<string, Lazy<IConnection>> Connections { get; }
-
-        private bool _isDisposed;
-
-        public ConnectionPool(IOptions<AbpRabbitMqOptions> options)
-        {
-            Options = options.Value;
-            Connections = new ConcurrentDictionary<string, Lazy<IConnection>>();
-        }
-
-        public virtual IConnection Get(string connectionName = null)
+    public virtual async Task<IConnection> GetAsync(string? connectionName = null)
+    {
+        using (await Semaphore.LockAsync())
         {
             connectionName ??= RabbitMqConnections.DefaultConnectionName;
 
+            if (Connections.TryGetValue(connectionName, out var existingConnection) && existingConnection.IsOpen)
+            {
+                return existingConnection;
+            }
+
+            if(existingConnection != null)
+            {
+                await existingConnection.DisposeAsync();
+            }
+
+            var connectionFactory = Options.Connections.GetOrDefault(connectionName);
+            var connection = await GetConnectionAsync(connectionName, connectionFactory);
+            Connections[connectionName] = connection;
+            return connection;
+        }
+    }
+
+    protected virtual async Task<IConnection> GetConnectionAsync(string connectionName, ConnectionFactory connectionFactory)
+    {
+        var hostnames = connectionFactory.HostName.TrimEnd(';').Split(';');
+        // Handle Rabbit MQ Cluster.
+        return hostnames.Length == 1
+            ? await connectionFactory.CreateConnectionAsync()
+            : await connectionFactory.CreateConnectionAsync(hostnames);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+
+        foreach (var connection in Connections.Values)
+        {
             try
             {
-                var lazyConnection = Connections.GetOrAdd(
-                    connectionName, () => new Lazy<IConnection>(() =>
-                    {
-                        var connection = Options.Connections.GetOrDefault(connectionName);
-                        var hostnames = connection.HostName.TrimEnd(';').Split(';');
-                        // Handle Rabbit MQ Cluster.
-                        return hostnames.Length == 1 ? connection.CreateConnection() : connection.CreateConnection(hostnames);
-
-                    })
-                );
-
-                return lazyConnection.Value;
+                await connection.DisposeAsync();
             }
-            catch (Exception)
+            catch
             {
-                Connections.TryRemove(connectionName, out _);
-                throw;
+                // ignored
             }
         }
 
-        public void Dispose()
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            _isDisposed = true;
-
-            foreach (var connection in Connections.Values)
-            {
-                try
-                {
-                    connection.Value.Dispose();
-                }
-                catch
-                {
-
-                }
-            }
-
-            Connections.Clear();
-        }
+        Connections.Clear();
     }
 }

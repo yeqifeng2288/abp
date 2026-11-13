@@ -1,21 +1,18 @@
 ﻿using Volo.Abp.Modularity;
-using Volo.Abp.Studio;
 using Volo.Abp.VirtualFileSystem;
 
-namespace Volo.Abp.CmsKit
+namespace Volo.Abp.CmsKit;
+
+[DependsOn(
+    typeof(AbpVirtualFileSystemModule)
+    )]
+public class VoloCmsKitInstallerModule : AbpModule
 {
-    [DependsOn(
-        typeof(AbpStudioModuleInstallerModule),
-        typeof(AbpVirtualFileSystemModule)
-        )]
-    public class VoloCmsKitDatabaseInstallerModule : AbpModule
+    public override void ConfigureServices(ServiceConfigurationContext context)
     {
-        public override void ConfigureServices(ServiceConfigurationContext context)
+        Configure<AbpVirtualFileSystemOptions>(options =>
         {
-            Configure<AbpVirtualFileSystemOptions>(options =>
-            {
-                options.FileSets.AddEmbedded<VoloCmsKitDatabaseInstallerModule>();
-            });
-        }
+            options.FileSets.AddEmbedded<VoloCmsKitInstallerModule>();
+        });
     }
 }

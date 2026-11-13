@@ -1,10 +1,13 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.io/license
+ * found in the LICENSE file at https://angular.dev/license
  */
+
+import { UpdateRecorder } from '@angular-devkit/schematics';
+
 export interface Host {
   write(path: string, content: string): Promise<void>;
   read(path: string): Promise<string>;
@@ -44,7 +47,11 @@ export class InsertChange implements Change {
   order: number;
   description: string;
 
-  constructor(public path: string, public pos: number, public toAdd: string) {
+  constructor(
+    public path: string,
+    public pos: number,
+    public toAdd: string,
+  ) {
     if (pos < 0) {
       throw new Error('Negative positions are invalid');
     }
@@ -72,7 +79,11 @@ export class RemoveChange implements Change {
   order: number;
   description: string;
 
-  constructor(public path: string, private pos: number, private toRemove: string) {
+  constructor(
+    public path: string,
+    private pos: number,
+    public toRemove: string,
+  ) {
     if (pos < 0) {
       throw new Error('Negative positions are invalid');
     }
@@ -101,8 +112,8 @@ export class ReplaceChange implements Change {
   constructor(
     public path: string,
     private pos: number,
-    private oldText: string,
-    private newText: string,
+    public oldText: string,
+    public newText: string,
   ) {
     if (pos < 0) {
       throw new Error('Negative positions are invalid');
@@ -124,5 +135,20 @@ export class ReplaceChange implements Change {
       // TODO: throw error if oldText doesn't match removed string.
       return host.write(this.path, `${prefix}${this.newText}${suffix}`);
     });
+  }
+}
+
+export function applyToUpdateRecorder(recorder: UpdateRecorder, changes: Change[]): void {
+  for (const change of changes) {
+    if (change instanceof InsertChange) {
+      recorder.insertLeft(change.pos, change.toAdd);
+    } else if (change instanceof RemoveChange) {
+      recorder.remove(change.order, change.toRemove.length);
+    } else if (change instanceof ReplaceChange) {
+      recorder.remove(change.order, change.oldText.length);
+      recorder.insertLeft(change.order, change.newText);
+    } else if (!(change instanceof NoopChange)) {
+      throw new Error('Unknown Change type encountered when updating a recorder.');
+    }
   }
 }

@@ -3,53 +3,55 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Volo.Abp.Authorization.Permissions;
+using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Guids;
 using Volo.Abp.Identity;
 using Volo.Abp.MultiTenancy;
 
-namespace Volo.Abp.PermissionManagement.Identity
+namespace Volo.Abp.PermissionManagement.Identity;
+
+public class RolePermissionManagementProvider : PermissionManagementProvider
 {
-    public class RolePermissionManagementProvider : PermissionManagementProvider
+    public override string Name => RolePermissionValueProvider.ProviderName;
+
+    protected IUserRoleFinder UserRoleFinder { get; }
+
+    public RolePermissionManagementProvider(
+        IPermissionGrantRepository permissionGrantRepository,
+        IGuidGenerator guidGenerator,
+        ICurrentTenant currentTenant,
+        IUserRoleFinder userRoleFinder)
+        : base(
+            permissionGrantRepository,
+            guidGenerator,
+            currentTenant)
     {
-        public override string Name => RolePermissionValueProvider.ProviderName;
+        UserRoleFinder = userRoleFinder;
+    }
 
-        protected IUserRoleFinder UserRoleFinder { get; }
+    public async override Task<PermissionValueProviderGrantInfo> CheckAsync(string name, string providerName, string providerKey)
+    {
+        var multipleGrantInfo = await CheckAsync(new[] { name }, providerName, providerKey);
 
-        public RolePermissionManagementProvider(
-            IPermissionGrantRepository permissionGrantRepository,
-            IGuidGenerator guidGenerator,
-            ICurrentTenant currentTenant,
-            IUserRoleFinder userRoleFinder)
-            : base(
-                permissionGrantRepository,
-                guidGenerator,
-                currentTenant)
-        {
-            UserRoleFinder = userRoleFinder;
-        }
+        return multipleGrantInfo.Result.Values.First();
+    }
 
-        public override async Task<PermissionValueProviderGrantInfo> CheckAsync(string name, string providerName, string providerKey)
-        {
-            var multipleGrantInfo = await CheckAsync(new[] {name}, providerName, providerKey);
-
-            return multipleGrantInfo.Result.Values.First();
-        }
-
-        public override async Task<MultiplePermissionValueProviderGrantInfo> CheckAsync(string[] names, string providerName, string providerKey)
+    public async override Task<MultiplePermissionValueProviderGrantInfo> CheckAsync(string[] names, string providerName, string providerKey)
+    {
+        using (PermissionGrantRepository.DisableTracking())
         {
             var multiplePermissionValueProviderGrantInfo = new MultiplePermissionValueProviderGrantInfo(names);
             var permissionGrants = new List<PermissionGrant>();
 
             if (providerName == Name)
             {
-                 permissionGrants.AddRange(await PermissionGrantRepository.GetListAsync(names, providerName, providerKey));
+                permissionGrants.AddRange(await PermissionGrantRepository.GetListAsync(names, providerName, providerKey));
 
             }
 
-            if (providerName == UserPermissionValueProvider.ProviderName)
+            if (providerName == UserPermissionValueProvider.ProviderName && Guid.TryParse(providerKey, out var userId))
             {
-                var userId = Guid.Parse(providerKey);
-                var roleNames = await UserRoleFinder.GetRolesAsync(userId);
+                var roleNames = await UserRoleFinder.GetRoleNamesAsync(userId);
 
                 foreach (var roleName in roleNames)
                 {
@@ -63,9 +65,18 @@ namespace Volo.Abp.PermissionManagement.Identity
                 return multiplePermissionValueProviderGrantInfo;
             }
 
+            var permissionGrantsByName = new Dictionary<string, PermissionGrant>();
+            foreach (var permissionGrant in permissionGrants)
+            {
+                if (!permissionGrantsByName.ContainsKey(permissionGrant.Name))
+                {
+                    permissionGrantsByName[permissionGrant.Name] = permissionGrant;
+                }
+            }
+
             foreach (var permissionName in names)
             {
-                var permissionGrant = permissionGrants.FirstOrDefault(x => x.Name == permissionName);
+                var permissionGrant = permissionGrantsByName.GetOrDefault(permissionName);
                 if (permissionGrant != null)
                 {
                     multiplePermissionValueProviderGrantInfo.Result[permissionName] = new PermissionValueProviderGrantInfo(true, permissionGrant.ProviderKey);

@@ -29,13 +29,18 @@
     "FullSearch": "Искать в документах",
     "Volo.Docs.Domain:010001": "Эластичный поиск не включен.",
     "MultipleVersionDocumentInfo": "У этого документа есть несколько версий. Выберите наиболее подходящие для вас варианты.",
+    "DocumentOptions": "Параметры документа",
     "New": "Новый",
     "Upd": "Upd",
     "NewExplanation": "Создано за последние две недели.",
     "UpdatedExplanation": "Обновлено за последние две недели.",
     "Volo.Docs.Domain:010002": "ShortName {ShortName} уже существует.",
+    "Volo.Docs.Domain:010003": "К сожалению, запрошенный документ не найден!",
     "Preview": "предварительный просмотр",
     "Search": "Поиск",
-    "SearchResults": "результаты поиска"
+    "SearchResults": "результаты поиска",
+    "SearchInTheAllDocuments": "Искать во всех документах",
+    "GoogleTranslate": "Google Translate",
+    "DownloadPDF": "Скачать PDF"
   }
 }

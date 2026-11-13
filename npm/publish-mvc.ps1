@@ -22,10 +22,15 @@ $IsPrerelease = $(node publish-utils.js --prerelease --customVersion $Version) -
 
 if ($IsPrerelease) {
   $PacksPublishCommand = $PacksPublishCommand.Substring(0, $PacksPublishCommand.Length - 1) + " --tag next'"
+} else {
+  $MaintenanceTag = "$(node publish-utils.js --distTag $Registry --customVersion $Version)".Trim()
+  if ($MaintenanceTag) {
+    $PacksPublishCommand = $PacksPublishCommand.Substring(0, $PacksPublishCommand.Length - 1) + " --tag $MaintenanceTag'"
+  }
 }
 
 $commands = (
-  "npm run lerna -- version $Version --yes --no-commit-hooks --skip-git --force-publish",
+  "npm run lerna -- version $Version --yes --no-commit-hooks --no-git-tag-version --no-push --force-publish",
   "yarn replace-with-tilde",
   "cd scripts",
   "yarn install",

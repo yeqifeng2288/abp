@@ -1,19 +1,32 @@
-import { AuthService } from '@abp/ng.core';
-import { Component } from '@angular/core';
-import { OAuthService } from 'angular-oauth2-oidc';
+import { AuthService, LocalizationPipe } from '@abp/ng.core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ButtonComponent, CardBodyComponent, CardComponent } from '@abp/ng.theme.shared';
+import { RouterLink } from '@angular/router';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-home',
   templateUrl: './home.component.html',
+  imports: [
+    NgTemplateOutlet,
+    LocalizationPipe,
+    CardComponent,
+    CardBodyComponent,
+    ButtonComponent,
+    RouterLink
+  ],
 })
 export class HomeComponent {
+  protected readonly authService = inject(AuthService);
+  readonly loading = signal(false);
+
   get hasLoggedIn(): boolean {
-    return this.oAuthService.hasValidAccessToken();
+    return this.authService.isAuthenticated;
   }
 
-  constructor(private oAuthService: OAuthService, private authService: AuthService) {}
-
   login() {
+    this.loading.set(true);
     this.authService.navigateToLogin();
   }
 }

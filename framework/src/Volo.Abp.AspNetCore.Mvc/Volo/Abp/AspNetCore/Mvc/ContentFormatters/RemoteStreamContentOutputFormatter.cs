@@ -4,38 +4,49 @@ using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Net.Http.Headers;
 using Volo.Abp.Content;
 
-namespace Volo.Abp.AspNetCore.Mvc.ContentFormatters
+namespace Volo.Abp.AspNetCore.Mvc.ContentFormatters;
+
+public class RemoteStreamContentOutputFormatter : OutputFormatter
 {
-    public class RemoteStreamContentOutputFormatter : OutputFormatter
+    public RemoteStreamContentOutputFormatter()
     {
-        public RemoteStreamContentOutputFormatter()
-        {
-            SupportedMediaTypes.Add(MediaTypeHeaderValue.Parse("*/*"));
-        }
+        SupportedMediaTypes.Add(MediaTypeHeaderValue.Parse("*/*"));
+    }
 
-        protected override bool CanWriteType(Type type)
-        {
-            return typeof(IRemoteStreamContent).IsAssignableFrom(type);
-        }
+    protected override bool CanWriteType(Type? type)
+    {
+        return typeof(IRemoteStreamContent).IsAssignableFrom(type);
+    }
 
-        public override async Task WriteResponseBodyAsync(OutputFormatterWriteContext context)
-        {
-            var remoteStream = (IRemoteStreamContent)context.Object;
+    public async override Task WriteResponseBodyAsync(OutputFormatterWriteContext context)
+    {
+        var remoteStream = (IRemoteStreamContent?)context.Object;
 
-            if (remoteStream != null)
+        if (remoteStream != null)
+        {
+            context.HttpContext.Response.ContentType = remoteStream.ContentType;
+            context.HttpContext.Response.ContentLength = remoteStream.ContentLength;
+
+            if (!remoteStream.FileName.IsNullOrWhiteSpace() && !context.HttpContext.Response.Headers.ContainsKey(HeaderNames.ContentDisposition))
             {
-                context.HttpContext.Response.ContentType = remoteStream.ContentType;
+                var contentDisposition = new ContentDispositionHeaderValue("attachment");
+                contentDisposition.SetHttpFileName(remoteStream.FileName);
+                context.HttpContext.Response.Headers[HeaderNames.ContentDisposition] = contentDisposition.ToString();
+            }
 
-                if (!remoteStream.FileName.IsNullOrWhiteSpace())
+            var cancellationToken = context.HttpContext.RequestAborted;
+
+            using (remoteStream)
+            {
+                var stream = remoteStream.GetStream();
+
+                try
                 {
-                    var contentDisposition = new ContentDispositionHeaderValue("attachment");
-                    contentDisposition.SetHttpFileName(remoteStream.FileName);
-                    context.HttpContext.Response.Headers[HeaderNames.ContentDisposition] = contentDisposition.ToString();
+                    await stream.CopyToAsync(context.HttpContext.Response.Body, cancellationToken);
                 }
-
-                using (remoteStream)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    await remoteStream.GetStream().CopyToAsync(context.HttpContext.Response.Body);
+                    // The request was aborted, nothing can be written to the response anymore.
                 }
             }
         }

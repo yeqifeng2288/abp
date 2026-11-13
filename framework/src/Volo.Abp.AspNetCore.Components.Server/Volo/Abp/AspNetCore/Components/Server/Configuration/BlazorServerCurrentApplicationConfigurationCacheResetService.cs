@@ -1,29 +1,33 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Volo.Abp.AspNetCore.Components.Web.Configuration;
+using Volo.Abp.AspNetCore.Components.Web.Security;
 using Volo.Abp.AspNetCore.Mvc.ApplicationConfigurations;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EventBus.Local;
 
-namespace Volo.Abp.AspNetCore.Components.Server.Configuration
+namespace Volo.Abp.AspNetCore.Components.Server.Configuration;
+
+[Dependency(ReplaceServices = true)]
+public class BlazorServerCurrentApplicationConfigurationCacheResetService :
+    ICurrentApplicationConfigurationCacheResetService,
+    ITransientDependency
 {
-    [Dependency(ReplaceServices = true)]
-    public class BlazorServerCurrentApplicationConfigurationCacheResetService : 
-        ICurrentApplicationConfigurationCacheResetService, 
-        ITransientDependency
+    private readonly ILocalEventBus _localEventBus;
+    private readonly ApplicationConfigurationChangedService _applicationConfigurationChangedService;
+
+    public BlazorServerCurrentApplicationConfigurationCacheResetService(
+        ILocalEventBus localEventBus,
+        ApplicationConfigurationChangedService applicationConfigurationChangedService)
     {
-        private readonly ILocalEventBus _localEventBus;
+        _localEventBus = localEventBus;
+        _applicationConfigurationChangedService = applicationConfigurationChangedService;
+    }
 
-        public BlazorServerCurrentApplicationConfigurationCacheResetService(
-            ILocalEventBus localEventBus)
-        {
-            _localEventBus = localEventBus;
-        }
+    public async Task ResetAsync(Guid? userId = null)
+    {
+        await _localEventBus.PublishAsync(new CurrentApplicationConfigurationCacheResetEventData(userId));
 
-        public async Task ResetAsync()
-        {
-            await _localEventBus.PublishAsync(
-                new CurrentApplicationConfigurationCacheResetEventData()
-            );
-        }
+        _applicationConfigurationChangedService.NotifyChanged();
     }
 }

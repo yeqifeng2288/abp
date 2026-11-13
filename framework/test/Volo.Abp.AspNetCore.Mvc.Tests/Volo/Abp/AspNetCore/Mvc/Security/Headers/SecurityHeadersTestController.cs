@@ -1,12 +1,19 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
-namespace Volo.Abp.AspNetCore.Mvc.Security.Headers
+namespace Volo.Abp.AspNetCore.Mvc.Security.Headers;
+
+[Route("SecurityHeadersTest")]
+public class SecurityHeadersTestController : AbpController
 {
-    public class SecurityHeadersTestController : AbpController
+    [HttpGet("Get")]
+    public ActionResult Get()
     {
-        public ActionResult Get()
-        {
-            return Content("OK");
-        }
+        return Content("OK");
+    }
+
+    [HttpGet("ignored")]
+    public ActionResult Get_Ignored()
+    {
+        return Content("OK");
     }
 }

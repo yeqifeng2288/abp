@@ -1,162 +1,163 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Pages.Abp.MultiTenancy.ClientProxies;
-using Volo.Abp.AspNetCore.Mvc.MultiTenancy;
 using Volo.Abp.Caching;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.Threading;
 
-namespace Volo.Abp.AspNetCore.Mvc.Client
+namespace Volo.Abp.AspNetCore.Mvc.Client;
+
+public class MvcRemoteTenantStore : ITenantStore, ITransientDependency
 {
-    public class MvcRemoteTenantStore : ITenantStore, ITransientDependency
+    public ILogger<MvcRemoteTenantStore> Logger { get; set; }
+
+    protected AbpTenantClientProxy TenantAppService { get; }
+    protected IHttpContextAccessor HttpContextAccessor { get; }
+    protected IDistributedCache<TenantConfigurationCacheItem> Cache { get; }
+    protected AbpAspNetCoreMvcClientCacheOptions Options { get; }
+
+    public MvcRemoteTenantStore(
+        AbpTenantClientProxy tenantAppService,
+        IHttpContextAccessor httpContextAccessor,
+        IDistributedCache<TenantConfigurationCacheItem> cache,
+        IOptions<AbpAspNetCoreMvcClientCacheOptions> options)
     {
-        protected AbpTenantClientProxy TenantAppService { get; }
-        protected IHttpContextAccessor HttpContextAccessor { get; }
-        protected IDistributedCache<TenantConfiguration> Cache { get; }
+        Logger = NullLogger<MvcRemoteTenantStore>.Instance;
 
-        public MvcRemoteTenantStore(
-            AbpTenantClientProxy tenantAppService,
-            IHttpContextAccessor httpContextAccessor,
-            IDistributedCache<TenantConfiguration> cache)
+        TenantAppService = tenantAppService;
+        HttpContextAccessor = httpContextAccessor;
+        Cache = cache;
+        Options = options.Value;
+    }
+
+    public async Task<TenantConfiguration?> FindAsync(string normalizedName)
+    {
+        var cacheKey = TenantConfigurationCacheItem.CalculateCacheKey(normalizedName);
+        var httpContext = HttpContextAccessor?.HttpContext;
+
+        if (httpContext != null && httpContext.Items[cacheKey] is TenantConfigurationCacheItem tenantConfigurationInHttpContext)
         {
-            TenantAppService = tenantAppService;
-            HttpContextAccessor = httpContextAccessor;
-            Cache = cache;
+            return tenantConfigurationInHttpContext?.Value;
         }
 
-        public async Task<TenantConfiguration> FindAsync(string name)
+        var tenantConfiguration = await Cache.GetAsync(cacheKey);
+        if (tenantConfiguration?.Value == null)
         {
-            var cacheKey = CreateCacheKey(name);
-            var httpContext = HttpContextAccessor?.HttpContext;
-
-            if (httpContext != null && httpContext.Items[cacheKey] is TenantConfiguration tenantConfiguration)
+            var tenant = await TenantAppService.FindTenantByNameAsync(normalizedName);
+            tenantConfiguration = await Cache.GetAsync(cacheKey);
+            if (tenant.Success && tenantConfiguration?.Value == null)
             {
-                return tenantConfiguration;
+                Logger.LogWarning($"Tenant with name '{normalizedName}' was found, but not present in the distributed cache, " +
+                                  "Ensure all applications use the same distributed cache and the same cache key prefix");
             }
-
-            tenantConfiguration = await Cache.GetOrAddAsync(
-                cacheKey,
-                async () => CreateTenantConfiguration(await TenantAppService.FindTenantByNameAsync(name)),
-                () => new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow =
-                        TimeSpan.FromMinutes(5) //TODO: Should be configurable.
-                }
-            );
-
-            if (httpContext != null)
-            {
-                httpContext.Items[cacheKey] = tenantConfiguration;
-            }
-
-            return tenantConfiguration;
         }
 
-        public async Task<TenantConfiguration> FindAsync(Guid id)
+        if (httpContext != null)
         {
-            var cacheKey = CreateCacheKey(id);
-            var httpContext = HttpContextAccessor?.HttpContext;
-
-            if (httpContext != null && httpContext.Items[cacheKey] is TenantConfiguration tenantConfiguration)
-            {
-                return tenantConfiguration;
-            }
-
-            tenantConfiguration = await Cache.GetOrAddAsync(
-                cacheKey,
-                async () => CreateTenantConfiguration(await TenantAppService.FindTenantByIdAsync(id)),
-                () => new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow =
-                        TimeSpan.FromMinutes(5) //TODO: Should be configurable.
-                }
-            );
-
-            if (httpContext != null)
-            {
-                httpContext.Items[cacheKey] = tenantConfiguration;
-            }
-
-            return tenantConfiguration;
+            httpContext.Items[cacheKey] = tenantConfiguration;
         }
 
-        public TenantConfiguration Find(string name)
+        return tenantConfiguration?.Value;
+    }
+
+    public async Task<TenantConfiguration?> FindAsync(Guid id)
+    {
+        var cacheKey = TenantConfigurationCacheItem.CalculateCacheKey(id);
+        var httpContext = HttpContextAccessor?.HttpContext;
+
+        if (httpContext != null && httpContext.Items[cacheKey] is TenantConfigurationCacheItem tenantConfigurationInHttpContext)
         {
-            var cacheKey = CreateCacheKey(name);
-            var httpContext = HttpContextAccessor?.HttpContext;
-
-            if (httpContext != null && httpContext.Items[cacheKey] is TenantConfiguration tenantConfiguration)
-            {
-                return tenantConfiguration;
-            }
-
-            tenantConfiguration = Cache.GetOrAdd(
-                cacheKey,
-                () => AsyncHelper.RunSync(async () => CreateTenantConfiguration(await TenantAppService.FindTenantByNameAsync(name))),
-                () => new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow =
-                        TimeSpan.FromMinutes(5) //TODO: Should be configurable.
-                }
-            );
-
-            if (httpContext != null)
-            {
-                httpContext.Items[cacheKey] = tenantConfiguration;
-            }
-
-            return tenantConfiguration;
+            return tenantConfigurationInHttpContext?.Value;
         }
 
-        public TenantConfiguration Find(Guid id)
+        var tenantConfiguration = await Cache.GetAsync(cacheKey);
+        if (tenantConfiguration?.Value == null)
         {
-            var cacheKey = CreateCacheKey(id);
-            var httpContext = HttpContextAccessor?.HttpContext;
-
-            if (httpContext != null && httpContext.Items[cacheKey] is TenantConfiguration tenantConfiguration)
+            var tenant = await TenantAppService.FindTenantByIdAsync(id);
+            tenantConfiguration = await Cache.GetAsync(cacheKey);
+            if (tenant.Success && tenantConfiguration?.Value == null)
             {
-                return tenantConfiguration;
+                Logger.LogWarning($"Tenant with ID '{id}' was found, but not present in the distributed cache, " +
+                                  "Ensure all applications use the same distributed cache and the same cache key prefix");
             }
+        }
 
-            tenantConfiguration = Cache.GetOrAdd(
-                cacheKey,
-                () => AsyncHelper.RunSync(async () => CreateTenantConfiguration(await TenantAppService.FindTenantByIdAsync(id))),
-                () => new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow =
-                        TimeSpan.FromMinutes(5) //TODO: Should be configurable.
-                }
-            );
+        if (httpContext != null)
+        {
+            httpContext.Items[cacheKey] = tenantConfiguration;
+        }
 
-            if (httpContext != null)
+        return tenantConfiguration?.Value;
+    }
+
+    public Task<IReadOnlyList<TenantConfiguration>> GetListAsync(bool includeDetails = false)
+    {
+        return Task.FromResult<IReadOnlyList<TenantConfiguration>>(Array.Empty<TenantConfiguration>());
+    }
+
+    public TenantConfiguration? Find(string normalizedName)
+    {
+        var cacheKey = TenantConfigurationCacheItem.CalculateCacheKey(normalizedName);
+        var httpContext = HttpContextAccessor?.HttpContext;
+
+        if (httpContext != null && httpContext.Items[cacheKey] is TenantConfigurationCacheItem tenantConfigurationInHttpContext)
+        {
+            return tenantConfigurationInHttpContext?.Value;
+        }
+
+        var tenantConfiguration = Cache.Get(cacheKey);
+        if (tenantConfiguration?.Value == null)
+        {
+            var tenant = AsyncHelper.RunSync(async () => await TenantAppService.FindTenantByNameAsync(normalizedName));
+            tenantConfiguration = Cache.Get(cacheKey);
+            if (tenant.Success && tenantConfiguration?.Value == null)
             {
-                httpContext.Items[cacheKey] = tenantConfiguration;
+                Logger.LogWarning($"Tenant with name '{normalizedName}' was found, but not present in the distributed cache, " +
+                                  "Ensure all applications use the same distributed cache and the same cache key prefix");
             }
-
-            return tenantConfiguration;
         }
 
-        protected virtual TenantConfiguration CreateTenantConfiguration(FindTenantResultDto tenantResultDto)
+        if (httpContext != null)
         {
-            if (!tenantResultDto.Success || tenantResultDto.TenantId == null)
+            httpContext.Items[cacheKey] = tenantConfiguration;
+        }
+
+        return tenantConfiguration?.Value;
+    }
+
+    public TenantConfiguration? Find(Guid id)
+    {
+        var cacheKey = TenantConfigurationCacheItem.CalculateCacheKey(id);
+        var httpContext = HttpContextAccessor?.HttpContext;
+
+        if (httpContext != null && httpContext.Items[cacheKey] is TenantConfigurationCacheItem tenantConfigurationInHttpContext)
+        {
+            return tenantConfigurationInHttpContext?.Value;
+        }
+
+        var tenantConfiguration = Cache.Get(cacheKey);
+        if (tenantConfiguration?.Value == null)
+        {
+            var tenant = AsyncHelper.RunSync(async () => await TenantAppService.FindTenantByIdAsync(id));
+            tenantConfiguration = Cache.Get(cacheKey);
+            if (tenant.Success && tenantConfiguration?.Value == null)
             {
-                return null;
+                Logger.LogWarning($"Tenant with ID '{id}' was found, but not present in the distributed cache, " +
+                                  "Ensure all applications use the same distributed cache and the same cache key prefix");
             }
-
-            return new TenantConfiguration(tenantResultDto.TenantId.Value, tenantResultDto.Name);
         }
 
-        protected virtual string CreateCacheKey(string tenantName)
+        if (httpContext != null)
         {
-            return $"RemoteTenantStore_Name_{tenantName}";
+            httpContext.Items[cacheKey] = tenantConfiguration;
         }
 
-        protected virtual string CreateCacheKey(Guid tenantId)
-        {
-            return $"RemoteTenantStore_Id_{tenantId:N}";
-        }
+        return tenantConfiguration?.Value;
     }
 }

@@ -1,29 +1,41 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System;
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.ObjectPool;
-using Volo.Abp.Json;
+using Volo.Abp.Json.SystemTextJson;
+using Volo.Abp.Json.SystemTextJson.JsonConverters;
+using Volo.Abp.Json.SystemTextJson.Modifiers;
 
-namespace Volo.Abp.AspNetCore.Mvc.Json
+namespace Volo.Abp.AspNetCore.Mvc.Json;
+
+public static class MvcCoreBuilderExtensions
 {
-    public static class MvcCoreBuilderExtensions
+    public static IMvcCoreBuilder AddAbpJson(this IMvcCoreBuilder builder)
     {
-        public static IMvcCoreBuilder AddAbpHybridJson(this IMvcCoreBuilder builder)
-        {
-            var abpJsonOptions = builder.Services.ExecutePreConfiguredActions<AbpJsonOptions>();
-            if (!abpJsonOptions.UseHybridSerializer)
+        builder.Services.AddAbpOptions<JsonOptions>()
+            .Configure<IServiceProvider>((options, rootServiceProvider) =>
             {
-                builder.Services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcNewtonsoftJsonOptions>, AbpMvcNewtonsoftJsonOptionsSetup>());
-                builder.AddNewtonsoftJson();
-                return builder;
-            }
+                options.JsonSerializerOptions.ReadCommentHandling = JsonCommentHandling.Skip;
+                options.JsonSerializerOptions.AllowTrailingCommas = true;
 
-            builder.Services.TryAddTransient<DefaultObjectPoolProvider>();
-            builder.Services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<JsonOptions>, AbpJsonOptionsSetup>());
-            builder.Services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcNewtonsoftJsonOptions>, AbpMvcNewtonsoftJsonOptionsSetup>());
-            builder.Services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, AbpHybridJsonOptionsSetup>());
-            return builder;
-        }
+                options.JsonSerializerOptions.Converters.Add(new AbpStringToEnumFactory());
+                options.JsonSerializerOptions.Converters.Add(new AbpStringToBooleanConverter());
+                options.JsonSerializerOptions.Converters.Add(new AbpStringToGuidConverter());
+                options.JsonSerializerOptions.Converters.Add(new AbpNullableStringToGuidConverter());
+                options.JsonSerializerOptions.Converters.Add(new ObjectToInferredTypesConverter());
+
+                options.JsonSerializerOptions.TypeInfoResolver = new AbpDefaultJsonTypeInfoResolver(rootServiceProvider
+                    .GetRequiredService<IOptions<AbpSystemTextJsonSerializerModifiersOptions>>());
+
+                var dateTimeConverter = rootServiceProvider.GetRequiredService<AbpDateTimeConverter>();
+                var nullableDateTimeConverter = rootServiceProvider.GetRequiredService<AbpNullableDateTimeConverter>();
+
+                options.JsonSerializerOptions.TypeInfoResolver.As<AbpDefaultJsonTypeInfoResolver>().Modifiers.Add(
+                    new AbpDateTimeConverterModifier(dateTimeConverter, nullableDateTimeConverter)
+                        .CreateModifyAction());
+            });
+
+        return builder;
     }
 }

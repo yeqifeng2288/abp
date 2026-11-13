@@ -2,18 +2,20 @@
 using Volo.Abp.Data;
 using Volo.Abp.MongoDB;
 
-namespace Volo.Abp.PermissionManagement.MongoDB
+namespace Volo.Abp.PermissionManagement.MongoDB;
+
+[ConnectionStringName(AbpPermissionManagementDbProperties.ConnectionStringName)]
+public class PermissionManagementMongoDbContext : AbpMongoDbContext, IPermissionManagementMongoDbContext
 {
-    [ConnectionStringName(AbpPermissionManagementDbProperties.ConnectionStringName)]
-    public class PermissionManagementMongoDbContext : AbpMongoDbContext, IPermissionManagementMongoDbContext
+    public IMongoCollection<PermissionGroupDefinitionRecord> PermissionGroups => Collection<PermissionGroupDefinitionRecord>();
+    public IMongoCollection<PermissionDefinitionRecord> Permissions => Collection<PermissionDefinitionRecord>();
+    public IMongoCollection<PermissionGrant> PermissionGrants => Collection<PermissionGrant>();
+    public IMongoCollection<ResourcePermissionGrant> ResourcePermissionGrants => Collection<ResourcePermissionGrant>();
+
+    protected override void CreateModel(IMongoModelBuilder modelBuilder)
     {
-        public IMongoCollection<PermissionGrant> PermissionGrants => Collection<PermissionGrant>();
+        base.CreateModel(modelBuilder);
 
-        protected override void CreateModel(IMongoModelBuilder modelBuilder)
-        {
-            base.CreateModel(modelBuilder);
-
-            modelBuilder.ConfigurePermissionManagement();
-        }
+        modelBuilder.ConfigurePermissionManagement();
     }
 }

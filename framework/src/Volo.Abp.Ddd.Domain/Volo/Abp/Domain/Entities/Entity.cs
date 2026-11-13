@@ -1,57 +1,67 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Volo.Abp.Domain.Entities
+namespace Volo.Abp.Domain.Entities;
+
+/// <inheritdoc/>
+[Serializable]
+public abstract class Entity : IEntity
 {
-    /// <inheritdoc/>
-    [Serializable]
-    public abstract class Entity : IEntity
+    protected Entity()
     {
-        protected Entity()
-        {
-            EntityHelper.TrySetTenantId(this);
-        }
-        
-        /// <inheritdoc/>
-        public override string ToString()
-        {
-            return $"[ENTITY: {GetType().Name}] Keys = {GetKeys().JoinAsString(", ")}";
-        }
-
-        public abstract object[] GetKeys();
-
-        public bool EntityEquals(IEntity other)
-        {
-            return EntityHelper.EntityEquals(this, other);
-        }
+        EntityHelper.TrySetTenantId(this);
     }
 
-    /// <inheritdoc cref="IEntity{TKey}" />
-    [Serializable]
-    public abstract class Entity<TKey> : Entity, IEntity<TKey>
+    /// <inheritdoc/>
+    public override string ToString()
     {
-        /// <inheritdoc/>
-        public virtual TKey Id { get; protected set; }
+        return $"[ENTITY: {GetType().Name}] Keys = {GetKeys().JoinAsString(", ")}";
+    }
 
-        protected Entity()
+    public virtual string? GetObjectKey()
+    {
+        var keys = GetKeys();
+        return keys.Length switch
         {
+            0 => null,
+            1 when keys[0] != null => keys[0]?.ToString(),
+            _ => KeyedObjectHelper.EncodeCompositeKey(keys)
+        };
+    }
 
-        }
+    public abstract object?[] GetKeys();
 
-        protected Entity(TKey id)
-        {
-            Id = id;
-        }
+    public bool EntityEquals(IEntity other)
+    {
+        return EntityHelper.EntityEquals(this, other);
+    }
+}
 
-        public override object[] GetKeys()
-        {
-            return new object[] {Id};
-        }
+/// <inheritdoc cref="IEntity{TKey}" />
+[Serializable]
+public abstract class Entity<TKey> : Entity, IEntity<TKey>
+{
+    /// <inheritdoc/>
+    public virtual TKey Id { get; protected set; } = default!;
 
-        /// <inheritdoc/>
-        public override string ToString()
-        {
-            return $"[ENTITY: {GetType().Name}] Id = {Id}";
-        }
+    protected Entity()
+    {
+
+    }
+
+    protected Entity(TKey id)
+    {
+        Id = id;
+    }
+
+    public override object?[] GetKeys()
+    {
+        return [Id];
+    }
+
+    /// <inheritdoc/>
+    public override string ToString()
+    {
+        return $"[ENTITY: {GetType().Name}] Id = {Id}";
     }
 }

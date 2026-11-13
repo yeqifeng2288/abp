@@ -1,4 +1,4 @@
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -8,6 +8,9 @@ import { reloadRoute } from '../utils/route-utils';
 
 @Injectable({ providedIn: 'root' })
 export class ReplaceableComponentsService {
+  private ngZone = inject(NgZone);
+  private router = inject(Router);
+
   private readonly store: InternalStore<ReplaceableComponents.ReplaceableComponent[]>;
 
   get replaceableComponents$(): Observable<ReplaceableComponents.ReplaceableComponent[]> {
@@ -22,8 +25,8 @@ export class ReplaceableComponentsService {
     return this.store.sliceUpdate(state => state);
   }
 
-  constructor(private ngZone: NgZone, private router: Router) {
-    this.store = new InternalStore([]);
+  constructor() {
+    this.store = new InternalStore([] as ReplaceableComponents.ReplaceableComponent[]);
   }
 
   add(replaceableComponent: ReplaceableComponents.ReplaceableComponent, reload?: boolean): void {
@@ -44,11 +47,11 @@ export class ReplaceableComponentsService {
     if (reload) reloadRoute(this.router, this.ngZone);
   }
 
-  get(replaceableComponentKey: string): ReplaceableComponents.ReplaceableComponent {
+  get(replaceableComponentKey: string): ReplaceableComponents.ReplaceableComponent | undefined {
     return this.replaceableComponents.find(component => component.key === replaceableComponentKey);
   }
 
-  get$(replaceableComponentKey: string): Observable<ReplaceableComponents.ReplaceableComponent> {
+  get$(replaceableComponentKey: string): Observable<ReplaceableComponents.ReplaceableComponent | undefined> {
     return this.replaceableComponents$.pipe(
       map(components => components.find(component => component.key === replaceableComponentKey)),
     );

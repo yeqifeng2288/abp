@@ -10,14 +10,20 @@ export function getLocaleDirection(locale: string): 'ltr' | 'rtl' {
 }
 
 export function createLocalizer(localization: ApplicationLocalizationConfigurationDto) {
-  return (resourceName: string, key: string, defaultValue: string) => {
+  return (resourceName: string, key: string, defaultValue: string | null) => {
     if (resourceName === '_') return key;
 
-    const resource = localization?.values?.[resourceName];
+    const resource = localization?.resources?.[resourceName];
 
-    if (!resource) return defaultValue;
+    if (!resource) {
+      const fallbackResource = localization?.values?.[resourceName];
 
-    return resource[key] || defaultValue;
+      if (!fallbackResource) return defaultValue;
+
+      return fallbackResource[key] || defaultValue;
+    }
+
+    return resource.texts?.[key] || defaultValue;
   };
 }
 

@@ -17,11 +17,13 @@ namespace Volo.Blogging.Users
 
         }
 
-        public async Task<List<BlogUser>> GetUsersAsync(int maxCount, string filter, CancellationToken cancellationToken = default)
+        public virtual async Task<List<BlogUser>> GetUsersAsync(int maxCount, string filter, CancellationToken cancellationToken = default)
         {
-            return await DbSet
-                .WhereIf( !string.IsNullOrWhiteSpace( filter), x=>x.UserName.Contains(filter))
-                .Take(maxCount).ToListAsync(cancellationToken);
+            return await (await GetDbSetAsync())
+                .WhereIf(!string.IsNullOrWhiteSpace(filter), x => x.UserName.Contains(filter))
+                .OrderBy(x => x.UserName)
+                .Take(maxCount)
+                .ToListAsync(GetCancellationToken(cancellationToken));
         }
     }
 }

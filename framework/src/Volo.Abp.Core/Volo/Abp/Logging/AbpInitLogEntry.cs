@@ -1,20 +1,21 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
 
-namespace Volo.Abp.Logging
+namespace Volo.Abp.Logging;
+
+public class AbpInitLogEntry
 {
-    public class AbpInitLogEntry
-    {
-        public LogLevel LogLevel { get; set; }
+    public string CategoryName { get; set; } = default!;
 
-        public EventId EventId { get; set; }
+    public LogLevel LogLevel { get; set; }
 
-        public object State { get; set; }
+    public EventId EventId { get; set; }
 
-        public Exception Exception { get; set; }
+    public object State { get; set; } = default!;
 
-        public Func<object, Exception, string> Formatter { get; set; }
+    public Exception? Exception { get; set; }
 
-        public string Message => Formatter(State, Exception);
-    }
+    public Func<object, Exception?, string> Formatter { get; set; } = default!;
+
+    public string Message => Formatter(State, Exception);
 }

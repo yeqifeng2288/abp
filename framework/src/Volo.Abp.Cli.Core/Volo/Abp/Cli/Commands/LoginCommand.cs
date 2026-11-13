@@ -2,43 +2,41 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using Volo.Abp.Cli.Args;
 using Volo.Abp.Cli.Auth;
-using Volo.Abp.Cli.Http;
 using Volo.Abp.Cli.ProjectBuilding;
 using Volo.Abp.Cli.Utils;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Threading;
 
-namespace Volo.Abp.Cli.Commands
+namespace Volo.Abp.Cli.Commands;
+
+public class LoginCommand : IConsoleCommand, ITransientDependency
 {
-    public class LoginCommand : IConsoleCommand, ITransientDependency
+    public const string Name = "login";
+
+    public ILogger<LoginCommand> Logger { get; set; }
+
+    protected AuthService AuthService { get; }
+    public ICancellationTokenProvider CancellationTokenProvider { get; }
+    public IRemoteServiceExceptionHandler RemoteServiceExceptionHandler { get; }
+
+    public LoginCommand(AuthService authService,
+        ICancellationTokenProvider cancellationTokenProvider,
+        IRemoteServiceExceptionHandler remoteServiceExceptionHandler)
     {
-        public ILogger<LoginCommand> Logger { get; set; }
+        AuthService = authService;
+        CancellationTokenProvider = cancellationTokenProvider;
+        RemoteServiceExceptionHandler = remoteServiceExceptionHandler;
+        Logger = NullLogger<LoginCommand>.Instance;
+    }
 
-        protected AuthService AuthService { get; }
-        public ICancellationTokenProvider CancellationTokenProvider { get; }
-        public IRemoteServiceExceptionHandler RemoteServiceExceptionHandler { get; }
-
-        private readonly CliHttpClientFactory _cliHttpClientFactory;
-
-        public LoginCommand(AuthService authService,
-            ICancellationTokenProvider cancellationTokenProvider,
-            IRemoteServiceExceptionHandler remoteServiceExceptionHandler,
-            CliHttpClientFactory cliHttpClientFactory)
-        {
-            AuthService = authService;
-            CancellationTokenProvider = cancellationTokenProvider;
-            RemoteServiceExceptionHandler = remoteServiceExceptionHandler;
-            _cliHttpClientFactory = cliHttpClientFactory;
-            Logger = NullLogger<LoginCommand>.Instance;
-        }
-
-        public async Task ExecuteAsync(CommandLineArgs commandLineArgs)
+    public async Task ExecuteAsync(CommandLineArgs commandLineArgs)
+    {
+        if (!commandLineArgs.Options.ContainsKey("device"))
         {
             if (commandLineArgs.Target.IsNullOrEmpty())
             {
@@ -87,124 +85,126 @@ namespace Volo.Abp.Cli.Commands
 
             Logger.LogInformation($"Successfully logged in as '{commandLineArgs.Target}'");
         }
-
-        private async Task<bool> HasMultipleOrganizationAndThisNotSpecified(CommandLineArgs commandLineArgs, string organization)
+        else
         {
-            if (string.IsNullOrWhiteSpace(organization) &&
-                await CheckMultipleOrganizationsAsync(commandLineArgs.Target))
+            try
             {
-                Logger.LogError($"You have multiple organizations, please specify your organization with `--organization` parameter.");
-                return true;
+                await AuthService.DeviceLoginAsync();
             }
-
-            return false;
-        }
-
-        private void LogCliError(Exception ex, CommandLineArgs args)
-        {
-            if (ex.Message.Contains("Invalid username or password"))
+            catch (Exception ex)
             {
-                Logger.LogError("Invalid username or password!");
+                LogCliError(ex, commandLineArgs);
                 return;
             }
 
-            if (TryGetErrorMessageFromHtmlPage(ex.Message, out var errorMsg))
-            {
-                Logger.LogError(errorMsg);
-                return;
-            }
+            var loginInfo = await AuthService.GetLoginInfoAsync();
+            Logger.LogInformation($"Successfully logged in as '{loginInfo.Username}'");
+        }
+    }
 
-            Logger.LogError(ex.Message);
+    private async Task<bool> HasMultipleOrganizationAndThisNotSpecified(CommandLineArgs commandLineArgs, string organization)
+    {
+        if (string.IsNullOrWhiteSpace(organization) &&
+            await AuthService.CheckMultipleOrganizationsAsync(commandLineArgs.Target))
+        {
+            Logger.LogError($"You have multiple organizations, please specify your organization with `--organization` parameter.");
+            return true;
         }
 
-        private static bool TryGetErrorMessageFromHtmlPage(string htmlPage, out string errorMessage)
+        return false;
+    }
+
+    private void LogCliError(Exception ex, CommandLineArgs args)
+    {
+        if (ex.Message.Contains("Invalid username or password"))
         {
-            if (!htmlPage.Contains("error-page-container"))
-            {
-                errorMessage = null;
-                return false;
-            }
+            Logger.LogError("Invalid username or password!");
+            return;
+        }
 
-            var decodedHtml = HttpUtility.HtmlDecode(htmlPage);
+        if (ex.Message.Contains("RequiresTwoFactor"))
+        {
+            Logger.LogError("Two factor authentication is enabled for your account. Please use `abp login --device` command to login.");
+            return;
+        }
 
-            var error = Regex.Match(decodedHtml,
-                @"<h2\ class=""text-danger.*"">(.*?)</h2>",
-                RegexOptions.IgnoreCase |
-                RegexOptions.IgnorePatternWhitespace |
-                RegexOptions.Singleline |
-                RegexOptions.Multiline);
+        if (TryGetErrorMessageFromHtmlPage(ex.Message, out var errorMsg))
+        {
+            Logger.LogError(errorMsg);
+            return;
+        }
 
-            if (error.Success && error.Groups.Count > 1)
-            {
-                errorMessage = error.Groups[1].Value;
-                errorMessage = errorMessage
-                    .Replace("<eof/>", string.Empty)
-                    .Replace("</small>", string.Empty);
+        Logger.LogError(ex.Message);
+    }
 
-                return true;
-            }
-
+    private static bool TryGetErrorMessageFromHtmlPage(string htmlPage, out string errorMessage)
+    {
+        if (!htmlPage.Contains("error-page-container"))
+        {
             errorMessage = null;
             return false;
         }
 
-        private async Task<bool> CheckMultipleOrganizationsAsync(string username)
+        var decodedHtml = HttpUtility.HtmlDecode(htmlPage);
+
+        var error = Regex.Match(decodedHtml,
+            @"<h2\ class=""text-danger.*"">(.*?)</h2>",
+            RegexOptions.IgnoreCase |
+            RegexOptions.IgnorePatternWhitespace |
+            RegexOptions.Singleline |
+            RegexOptions.Multiline);
+
+        if (error.Success && error.Groups.Count > 1)
         {
-            var url = $"{CliUrls.WwwAbpIo}api/license/check-multiple-organizations?username={username}";
+            errorMessage = error.Groups[1].Value;
+            errorMessage = errorMessage
+                .Replace("<eof/>", string.Empty)
+                .Replace("</small>", string.Empty);
 
-            var client = _cliHttpClientFactory.CreateClient();
-
-            using (var response = await client.GetHttpResponseMessageWithRetryAsync(url, CancellationTokenProvider.Token, Logger))
-            {
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new Exception($"ERROR: Remote server returns '{response.StatusCode}'");
-                }
-
-                await RemoteServiceExceptionHandler.EnsureSuccessfulHttpResponseAsync(response);
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<bool>(responseContent);
-            }
+            return true;
         }
 
-        public string GetUsageInfo()
+        errorMessage = null;
+        return false;
+    }
+
+    public string GetUsageInfo()
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("");
+        sb.AppendLine("Usage:");
+        sb.AppendLine("  abp login <username>");
+        sb.AppendLine("  abp login <username> -p <password>");
+        sb.AppendLine("  abp login <username> --device");
+        sb.AppendLine("");
+        sb.AppendLine("Example:");
+        sb.AppendLine("");
+        sb.AppendLine("  abp login john");
+        sb.AppendLine("  abp login john -p 1234");
+        sb.AppendLine("");
+        sb.AppendLine("See the documentation for more info: https://abp.io/docs/latest/cli");
+
+        return sb.ToString();
+    }
+
+    public static string GetShortDescription()
+    {
+        return "Sign in to " + CliUrls.AccountAbpIo + ".";
+    }
+
+    public static class Options
+    {
+        public static class Organization
         {
-            var sb = new StringBuilder();
-
-            sb.AppendLine("");
-            sb.AppendLine("Usage:");
-            sb.AppendLine("  abp login <username>");
-            sb.AppendLine("  abp login <username> -p <password>");
-            sb.AppendLine("");
-            sb.AppendLine("Example:");
-            sb.AppendLine("");
-            sb.AppendLine("  abp login john");
-            sb.AppendLine("  abp login john -p 1234");
-            sb.AppendLine("");
-            sb.AppendLine("See the documentation for more info: https://docs.abp.io/en/abp/latest/CLI");
-
-            return sb.ToString();
+            public const string Short = "o";
+            public const string Long = "organization";
         }
 
-        public string GetShortDescription()
+        public static class Password
         {
-            return "Sign in to " + CliUrls.AccountAbpIo + ".";
-        }
-
-        public static class Options
-        {
-            public static class Organization
-            {
-                public const string Short = "o";
-                public const string Long = "organization";
-            }
-
-            public static class Password
-            {
-                public const string Short = "p";
-                public const string Long = "password";
-            }
+            public const string Short = "p";
+            public const string Long = "password";
         }
     }
 }

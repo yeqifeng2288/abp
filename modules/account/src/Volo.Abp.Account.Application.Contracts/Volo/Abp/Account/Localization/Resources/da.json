@@ -10,6 +10,8 @@
     "UserLockedOutMessage": "Brugerkontoen er blevet låst grundet forkerte login forsøg. Vent venligst og prøv igen.",
     "InvalidUserNameOrPassword": "Forkert brugernavn eller kodeord!",
     "LoginIsNotAllowed": "Du kan ikke logge ind! Du skal bekræfte den angivne email/telefonnummer.",
+    "ExternalLoginPasswordChangeRequired": "Du kan ikke logge ind! Dit kodeord skal ændres, men det er ikke muligt med et eksternt login. Kontakt venligst din administrator.",
+    "RegisteredButLoginIsNotAllowed": "Din konto er oprettet, men du kan ikke logge ind endnu!",
     "SelfRegistrationDisabledMessage": "Selvregistrering er deaktiveret for denne applikation. Kontakt venligst applikationens administrator for at registrere en ny bruger.",
     "LocalLoginDisabledMessage": "Lokalt login er deaktiveret for denne appliaktion.",
     "Login": "Login",
@@ -35,6 +37,7 @@
     "PersonalSettingsSaved": "Personlige indstillinger gemt",
     "PasswordChanged": "Kodeord gemt",
     "NewPasswordConfirmFailed": "Bekræft venligst det nye kodeord.",
+    "NewPasswordSameAsOld": "Det nye kodeord skal være anderledes end det gamle.",
     "Manage": "Administrer",
     "MyAccount": "Min konto",
     "DisplayName:Abp.Account.IsSelfRegistrationEnabled": "Er registrering aktiveret",
@@ -49,7 +52,7 @@
     "SendPasswordResetLink_Information": "Et link til at nulstille dit kodeord vil blive sendt til din email. Hvis du ikke modtager en email indenfor et par minutter, venligst prøv igen.",
     "PasswordResetMailSentMessage": "Gendannelse af konto er sendt til din email. Hvis du ikke har modtaget emailen indenfor 15 minutter, kig i din spam folder. Hvis du finder den dér, venligst markér den som -Ikke Spam-. ",
     "ResetPassword": "Nulstil Kodeord",
-    "ConfirmPassword": "Bekræft (gentag) kodeordet",
+    "ConfirmPassword": "Bekræft kodeordet",
     "ResetPassword_Information": "Venligst indtast dit nye kodeord.",
     "YourPasswordIsSuccessfullyReset": "Dit kodeord blev ændret.",
     "GoToTheApplication": "Gå til applikationen",
@@ -62,6 +65,10 @@
     "PasswordResetInfoInEmail": "Vi har modtaget en forespørgsel for gendannelse af konto! Hvis du har lavet denne forespørgsel, klik på det efterfølgende link for at nulstille dit kodeord.",
     "ResetMyPassword": "Nulstil mit kodeord",
     "AccessDenied": "Adgang nægtet!",
-    "AccessDeniedMessage": "Du har ikke adgang til denne ressource."
+    "AccessDeniedMessage": "Du har ikke adgang til denne ressource.",
+    "OrRegisterWith": "Eller registrér med:",
+    "RegisterUsingYourProviderAccount": "Registrér med din {0} konto",
+    "RequireMigrateSeedTitle": "Kunne ikke finde administratorbrugeren",
+    "RequireMigrateSeedMessage": "Sørg for, at databasens seed bliver udført. Se <a target=\"_blank\" href=\"https://abp.io/kb/0003\">dokumentationen</a> for mulige løsninger."
   }
 }
